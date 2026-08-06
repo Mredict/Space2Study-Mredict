@@ -10,7 +10,7 @@ The project is structured as a **Monorepo** containing three main directories: `
 
 | Service | IP Address | Port | Technology Stack |
 | :--- | :--- | :--- | :--- |
-| **Frontend** | `192.168.56.10` | `3000` | React, Vite, PM2 |
+| **Frontend** | `192.168.56.10` | `3000` | React, Vite, Nginx|
 | **Backend API** | `192.168.56.11` | `8080` | Node.js, Express, PM2 |
 | **Database** | `192.168.56.12` | `27017` | MongoDB |
 
@@ -29,6 +29,28 @@ Before deploying the infrastructure, ensure you have the following installed on 
 
 To provision the infrastructure from scratch, navigate to the root directory (where your `Vagrantfile` is located) and run the following commands:
 
-1. **Boot and provision the Virtual Machines:**
+1. **Boot the VMs:**
    ```bash
    vagrant up
+2. **Configure VMs with Ansible playbooks**
+   ```bash
+   ansible-playbook -i ansible/inventories/local/hosts.ini ansible/site.yml --ask-vault-pass
+
+## 🚀 Deployment After VMs Recreation
+
+1. **Boot the VMs:**
+   ```bash
+   vagrant up
+2. **Deleting old ssh connections**
+   ```bash
+   ssh-keygen -f "/home/redict/.ssh/known_hosts" -R "192.168.56.10"
+   ssh-keygen -f "/home/redict/.ssh/known_hosts" -R "192.168.56.11"
+   ssh-keygen -f "/home/redict/.ssh/known_hosts" -R "192.168.56.12"
+3. **Setting right permissions**
+   ```bash
+   chmod 600 .vagrant/machines/database/virtualbox/private_key
+   chmod 600 .vagrant/machines/frontend/virtualbox/private_key
+   chmod 600 .vagrant/machines/backend/virtualbox/private_key
+4. **Configure VMs with Ansible playbooks**
+   ```bash
+   ansible-playbook -i ansible/inventories/local/hosts.ini ansible/site.yml --ask-vault-pass
