@@ -2,7 +2,7 @@ vagrant up
 
 ansible-playbook -i ansible/inventories/local/hosts.ini ansible/site.yml --ask-vault-pass
 
-For deploying the app (not for the first time) you need to enter this commands:
+Before using ansible-playbook (after recreating the machines) you need to enter this commands:
 
 ssh-keygen -f "/home/redict/.ssh/known_hosts" -R "192.168.56.10"
 ssh-keygen -f "/home/redict/.ssh/known_hosts" -R "192.168.56.11"
