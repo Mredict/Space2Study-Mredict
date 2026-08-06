@@ -46,7 +46,7 @@ id_rsa
 id_rsa.pub
 known_hosts
 
-secrets.yml
+group_vars/**/secrets.yml
 
 tmp/
 temp/
