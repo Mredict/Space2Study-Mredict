@@ -17,39 +17,39 @@
 
 - name: Clone Space2Study Backend repository
   ansible.builtin.git:
-    repo: "{{ backend_repo }}"
-    dest: /home/vagrant/Space2Study-BackEnd
+    repo: "{{ repo }}"
+    dest: /home/vagrant/Space2Study
     force: yes
 
 # # Email confirmation bypass
 # - name: Disable email confirmation requirement (Dev/Test bypass)
 #   ansible.builtin.replace:
-#     path: /home/vagrant/Space2Study-BackEnd/src/services/auth.js
+#     path: /home/vagrant/Space2Study/backend/src/services/auth.js
 #     regexp: '^(.*sendEmail.*)$'
 #     replace: '// \1'
 
 
 - name: Install backend NPM dependencies
   community.general.npm:
-    path: /home/vagrant/Space2Study-BackEnd
+    path: /home/vagrant/Space2Study/backend
     state: present
 
 - name: Create symlink for emails directory (Bugfix)
   ansible.builtin.file:
-    src: /home/vagrant/Space2Study-BackEnd/src/emails
-    dest: /home/vagrant/Space2Study-BackEnd/emails
+    src: /home/vagrant/Space2Study/backend/src/emails
+    dest: /home/vagrant/Space2Study/backend/emails
     state: link
 
 - name: Generate .env file from template
   ansible.builtin.template:
     src: backend-env.j2
-    dest: /home/vagrant/Space2Study-BackEnd/.env
+    dest: /home/vagrant/Space2Study/backend/.env
     mode: '0644'
 
 - name: Start backend application with PM2
   ansible.builtin.shell: pm2 start src/app.js --name "backend" || pm2 restart "backend"
   args:
-    chdir: /home/vagrant/Space2Study-BackEnd
+    chdir: /home/vagrant/Space2Study/backend
   become: false
 
 - name: Save PM2 process list

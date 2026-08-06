@@ -18,29 +18,29 @@
 
 - name: Clone Space2Study Frontend repository
   ansible.builtin.git:
-    repo: "{{ frontend_repo }}"
-    dest: /home/vagrant/Space2Study-FrontEnd
+    repo: "{{ repo }}"
+    dest: /home/vagrant/Space2Study
     force: yes
 
 - name: Generate .env file from template
   ansible.builtin.template:
     src: frontend-env.j2
-    dest: /home/vagrant/Space2Study-FrontEnd/.env
+    dest: /home/vagrant/Space2Study/frontend/.env
     mode: '0644'
 
 - name: Install frontend NPM dependencies
   community.general.npm:
-    path: /home/vagrant/Space2Study-FrontEnd
+    path: /home/vagrant/Space2Study/frontend
     state: present
   
 - name: Build frontend application
   ansible.builtin.shell: npm run build
   args:
-    chdir: /home/vagrant/Space2Study-FrontEnd
+    chdir: /home/vagrant/Space2Study/frontend
 
 - name: Copy built folder to Nginx directory
   ansible.builtin.copy:
-    src: /home/vagrant/Space2Study-FrontEnd/dist/
+    src: /home/vagrant/Space2Study/frontend/dist/
     dest: /var/www/frontend
     remote_src: yes
     owner: www-data
