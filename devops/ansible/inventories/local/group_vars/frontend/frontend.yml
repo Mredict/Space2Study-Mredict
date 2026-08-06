@@ -1,4 +1,4 @@
 ---
 # Non-sensitive frontend variables
-repo: "https://github.com/Mredict/Space2Study.git"
+repo: "https://github.com/Mredict/Space2Study-Mredict.git"
 vite_api_base_path: "http://192.168.56.11:8080"

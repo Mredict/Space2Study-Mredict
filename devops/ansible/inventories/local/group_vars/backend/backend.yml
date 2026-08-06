@@ -1,6 +1,6 @@
 ---
 # Non-sensitive backend variables
-repo: "https://github.com/Mredict/Space2Study.git"
+repo: "https://github.com/Mredict/Space2Study-Mredict.git"
 server_port: "8080"
 server_url: "http://192.168.56.11:8080"
 cookie_domain: "192.168.56.10"
