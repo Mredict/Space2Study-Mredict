@@ -1,0 +1,54 @@
+Vagrant.configure("2") do |config|
+  config.vm.box = "ubuntu/jammy64"
+  config.vm.network "private_network", ip: "192.168.56.20"
+
+  config.vm.network "forwarded_port", guest: 3000, host: 3000, id: "frontend"
+  config.vm.network "forwarded_port", guest: 8080, host: 8080, id: "backend"
+
+  config.vm.provider "virtualbox" do |vb|
+    vb.memory = "4096"
+    vb.cpus = 2
+  end
+
+  config.vm.provision "shell", inline: <<-SHELL
+    echo "Updating apt packages..."
+    apt-get update
+
+    echo "Installing Docker prerequisites..."
+    apt-get install -y ca-certificates curl gnupg lsb-release git
+
+    echo "Adding Docker official GPG key..."
+    mkdir -p /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+
+    echo "Setting up the Docker repository..."
+    echo \
+      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+      $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+    echo "Installing Docker Engine and Docker Compose (V2)..."
+    apt-get update
+    apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+
+    echo "Adding vagrant user to the docker group..."
+    usermod -aG docker vagrant
+
+    echo "Enabling Docker service..."
+    systemctl enable docker
+
+    echo "Cloning the Space2Study repository..."
+    git clone https://github.com/Mredict/Space2Study-Mredict.git /workspace
+    
+    echo "Starting the application using Docker Compose..."
+    cd /workspace
+    
+    # Check if docker-compose.yml exists before trying to run it
+    if [ -f "docker-compose.yml" ]; then
+      echo "Found docker-compose.yml. Building and starting containers..."
+      docker compose up -d --build
+    else
+      echo "WARNING: docker-compose.yml not found in /workspace root."
+      echo "Please create it and run 'docker compose up -d' manually."
+    fi
+  SHELL
+end
