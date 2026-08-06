@@ -32,6 +32,8 @@
   community.general.npm:
     path: /home/vagrant/Space2Study/frontend
     state: present
+    ignore_scripts: yes
+    production: yes
   
 - name: Build frontend application
   ansible.builtin.shell: npm run build

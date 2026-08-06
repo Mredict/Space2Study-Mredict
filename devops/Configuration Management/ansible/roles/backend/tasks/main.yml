@@ -33,6 +33,8 @@
   community.general.npm:
     path: /home/vagrant/Space2Study/backend
     state: present
+    ignore_scripts: yes
+    production: yes
 
 - name: Create symlink for emails directory (Bugfix)
   ansible.builtin.file:
