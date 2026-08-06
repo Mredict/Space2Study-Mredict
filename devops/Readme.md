@@ -48,9 +48,9 @@ To provision the infrastructure from scratch, navigate to the root directory (wh
    ssh-keygen -f "/home/redict/.ssh/known_hosts" -R "192.168.56.12"
 3. **Setting right permissions**
    ```bash
-   chmod 600 .vagrant/machines/database/virtualbox/private_key
-   chmod 600 .vagrant/machines/frontend/virtualbox/private_key
-   chmod 600 .vagrant/machines/backend/virtualbox/private_key
+   chmod 600 devops/Infrastructure/.vagrant/machines/database/virtualbox/private_key
+   chmod 600 devops/Infrastructure/.vagrant/machines/frontend/virtualbox/private_key
+   chmod 600 devops/Infrastructure/.vagrant/machines/backend/virtualbox/private_key
 4. **Configure VMs with Ansible playbooks**
    ```bash
-   ansible-playbook -i ansible/inventories/local/hosts.ini ansible/site.yml --ask-vault-pass
+   ansible-playbook -i devops/Configuration\ Management/ansible/inventories/local/hosts.ini devops/Configuration\ Management/ansible/site.yml --ask-vault-pass
