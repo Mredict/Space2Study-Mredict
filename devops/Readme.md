@@ -34,7 +34,7 @@ To provision the infrastructure from scratch, navigate to the root directory (wh
    vagrant up
 2. **Configure VMs with Ansible playbooks**
    ```bash
-   ansible-playbook -i ansible/inventories/local/hosts.ini ansible/site.yml --ask-vault-pass
+   ansible-playbook -i devops/Configuration\ Management/ansible/inventories/local/hosts.ini devops/Configuration\ Management/ansible/site.yml --ask-vault-pass
 
 ## 🚀 Deployment After VMs Recreation
 
