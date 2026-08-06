@@ -5,7 +5,10 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y xdg-utils
 
 COPY package*.json ./
-RUN npm install --ignore-scripts --production
+
+ENV HUSKY=0
+
+RUN npm install --legacy-peer-deps --ignore-scripts
 
 COPY . .
 
