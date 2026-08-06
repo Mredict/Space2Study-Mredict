@@ -1,0 +1,25 @@
+---
+- name: Update APT package cache
+  ansible.builtin.apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Install basic tools
+  ansible.builtin.apt:
+    name:
+      - curl
+      - git
+      - build-essential
+      - ufw
+    state: present
+
+- name: Allow SSH access
+  community.general.ufw:
+    rule: allow
+    name: OpenSSH
+
+- name: Enable UFW
+  community.general.ufw:
+    state: enabled
+    direction: incoming
+    policy: deny

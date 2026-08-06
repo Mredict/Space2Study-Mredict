@@ -1,0 +1,67 @@
+---
+- name: Add Node.js 18.x repository
+  ansible.builtin.shell: curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+  args:
+    creates: /etc/apt/sources.list.d/nodesource.list
+
+- name: Install Node.js
+  ansible.builtin.apt:
+    name: nodejs
+    state: present
+
+- name: Install PM2 globally
+  community.general.npm:
+    name: pm2
+    global: yes
+    state: present
+
+- name: Clone Space2Study Backend repository
+  ansible.builtin.git:
+    repo: "{{ backend_repo }}"
+    dest: /home/vagrant/Space2Study-BackEnd
+    force: yes
+
+# # Email confirmation bypass
+# - name: Disable email confirmation requirement (Dev/Test bypass)
+#   ansible.builtin.replace:
+#     path: /home/vagrant/Space2Study-BackEnd/src/services/auth.js
+#     regexp: '^(.*sendEmail.*)$'
+#     replace: '// \1'
+
+
+- name: Install backend NPM dependencies
+  community.general.npm:
+    path: /home/vagrant/Space2Study-BackEnd
+    state: present
+
+- name: Create symlink for emails directory (Bugfix)
+  ansible.builtin.file:
+    src: /home/vagrant/Space2Study-BackEnd/src/emails
+    dest: /home/vagrant/Space2Study-BackEnd/emails
+    state: link
+
+- name: Generate .env file from template
+  ansible.builtin.template:
+    src: backend-env.j2
+    dest: /home/vagrant/Space2Study-BackEnd/.env
+    mode: '0644'
+
+- name: Start backend application with PM2
+  ansible.builtin.shell: pm2 start src/app.js --name "backend" || pm2 restart "backend"
+  args:
+    chdir: /home/vagrant/Space2Study-BackEnd
+  become: false
+
+- name: Save PM2 process list
+  ansible.builtin.shell: pm2 save
+  become: false
+
+- name: Setup PM2 to start on boot
+  ansible.builtin.command: pm2 startup systemd -u vagrant --hp /home/vagrant
+  become: true
+
+- name: Allow incoming traffic to Node.js backend on port 8080
+  community.general.ufw:
+    rule: allow
+    port: '8080'
+    proto: tcp

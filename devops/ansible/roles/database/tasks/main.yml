@@ -1,0 +1,53 @@
+---
+- name: Install required packages
+  ansible.builtin.apt:
+    name:
+      - curl
+      - gnupg
+    state: present
+    update_cache: yes
+
+- name: Download MongoDB public GPG key
+  ansible.builtin.get_url:
+    url: https://pgp.mongodb.com/server-8.0.asc
+    dest: /tmp/mongodb-server-8.0.asc
+
+- name: Dearmor MongoDB GPG key
+  ansible.builtin.command:
+    cmd: gpg --dearmor -o /usr/share/keyrings/mongodb-server-8.0.gpg /tmp/mongodb-server-8.0.asc
+  args:
+    creates: /usr/share/keyrings/mongodb-server-8.0.gpg
+
+- name: Add MongoDB APT repository
+  ansible.builtin.apt_repository:
+    repo: "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/8.3 multiverse"
+    state: present
+    filename: mongodb-org-8.3
+    update_cache: yes
+
+- name: Install MongoDB
+  ansible.builtin.apt:
+    name: mongodb-org
+    state: present
+
+- name: Configure MongoDB using template
+  ansible.builtin.template:
+    src: mongod.conf.j2
+    dest: /etc/mongod.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart MongoDB
+
+- name: Ensure MongoDB service is running and enabled
+  ansible.builtin.systemd:
+    name: mongod
+    state: started
+    enabled: yes
+
+- name: Allow MongoDB traffic only from the Backend VM
+  community.general.ufw:
+    rule: allow
+    port: '27017'
+    proto: tcp
+    src: '192.168.56.11'

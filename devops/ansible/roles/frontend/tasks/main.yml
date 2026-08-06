@@ -1,0 +1,66 @@
+---
+- name: Add Node.js 18.x repository
+  ansible.builtin.shell: curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+  args:
+    creates: /etc/apt/sources.list.d/nodesource.list
+
+- name: Install Node.js and xdg-utils (Vite crash fix)
+  ansible.builtin.apt:
+    name: 
+      - nodejs
+      - xdg-utils
+    state: present
+
+- name: Install Nginx
+  ansible.builtin.apt:
+    name: nginx
+    state: present
+
+- name: Clone Space2Study Frontend repository
+  ansible.builtin.git:
+    repo: "{{ frontend_repo }}"
+    dest: /home/vagrant/Space2Study-FrontEnd
+    force: yes
+
+- name: Generate .env file from template
+  ansible.builtin.template:
+    src: frontend-env.j2
+    dest: /home/vagrant/Space2Study-FrontEnd/.env
+    mode: '0644'
+
+- name: Install frontend NPM dependencies
+  community.general.npm:
+    path: /home/vagrant/Space2Study-FrontEnd
+    state: present
+  
+- name: Build frontend application
+  ansible.builtin.shell: npm run build
+  args:
+    chdir: /home/vagrant/Space2Study-FrontEnd
+
+- name: Copy built folder to Nginx directory
+  ansible.builtin.copy:
+    src: /home/vagrant/Space2Study-FrontEnd/dist/
+    dest: /var/www/frontend
+    remote_src: yes
+    owner: www-data
+    group: www-data
+    mode: '0755'
+
+- name: Configure Nginx using template
+  ansible.builtin.template:
+    src: nginx.conf.j2
+    dest: /etc/nginx/sites-available/default
+    mode: '0644'
+
+- name: Restart Nginx to apply changes
+  ansible.builtin.service:
+    name: nginx
+    state: restarted
+    enabled: true
+  
+- name: Allow incoming traffic to Nginx on port 3000
+  community.general.ufw:
+    rule: allow
+    port: '3000'
+    proto: tcp
