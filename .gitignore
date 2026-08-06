@@ -46,7 +46,7 @@ id_rsa
 id_rsa.pub
 known_hosts
 
-group_vars/**/secrets.yml
+devops/Configuration\ Management/group_vars/**/secrets.yml
 
 tmp/
 temp/
