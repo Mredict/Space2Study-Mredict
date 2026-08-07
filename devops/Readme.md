@@ -1,4 +1,4 @@
-# 🚀 Space2Study — Infrastructure as Code (IaaC)
+# 🚀 Space2Study
 
 ## 📌 Deployment Methods
 * [Method 1: Vagrant + Ansible (Without Docker)](#-method-1-vagrant--ansible-without-docker)
@@ -59,6 +59,7 @@ To provision the infrastructure from scratch, navigate to the root directory (wh
    ```bash
    ansible-playbook -i devops/Configuration\ Management/ansible/inventories/local/hosts.ini devops/Configuration\ Management/ansible/site.yml --ask-vault-pass
 
+---
 ## 🐳 Method 2: Vagrant + Ansible + Docker
 
 # 🚀 Automated Deployment
