@@ -1,23 +1,20 @@
-FROM node:18 AS builder
+FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y xdg-utils
-
 COPY package*.json ./
-
-ENV HUSKY=0
-
 RUN npm install --legacy-peer-deps --ignore-scripts
 
 COPY . .
+
+ARG VITE_API_BASE_PATH
+ENV VITE_API_BASE_PATH=${VITE_API_BASE_PATH}
 
 RUN npm run build
 
 FROM nginx:alpine
 
 COPY --from=builder /app/dist /var/www/frontend
-
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 3000

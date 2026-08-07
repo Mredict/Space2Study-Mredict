@@ -7,6 +7,8 @@
 - name: Install basic tools
   ansible.builtin.apt:
     name:
+      - gnupg
+      - ca-certificates
       - curl
       - git
       - build-essential

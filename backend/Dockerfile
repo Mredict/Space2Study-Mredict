@@ -1,14 +1,16 @@
-FROM node:18
+FROM node:18-alpine
 
 WORKDIR /app
 
-COPY package*.json ./
+RUN chown -R node:node /app
 
+COPY package*.json ./
 RUN npm install --legacy-peer-deps
 
 COPY . .
-
 RUN ln -s /app/src/emails /app/emails
+
+USER node
 
 EXPOSE 8080
 

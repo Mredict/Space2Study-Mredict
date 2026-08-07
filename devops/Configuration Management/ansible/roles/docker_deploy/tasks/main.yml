@@ -1,0 +1,22 @@
+---
+- name: Verify that docker-compose.yml exists in the workspace
+  stat:
+    path: /workspace/docker-compose.yml
+  register: compose_file
+
+- name: Build and start services using Docker Compose
+  command: docker compose up -d --build
+  args:
+    chdir: /workspace
+  when: compose_file.stat.exists
+  register: compose_output
+
+- name: Display Docker Compose deployment output
+  debug:
+    var: compose_output.stdout_lines
+  when: compose_file.stat.exists and compose_output.stdout_lines is defined
+
+- name: Warn if docker-compose.yml is missing
+  debug:
+    msg: "WARNING: docker-compose.yml not found in /workspace. Containers were not started."
+  when: not compose_file.stat.exists
