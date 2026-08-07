@@ -8,8 +8,7 @@ COPY package*.json ./
 RUN npm install --legacy-peer-deps
 
 COPY . .
-RUN ln -s /app/src/emails /app/emails
-
+RUN ln -s /app/src/emails /app/emails ''' Bug fix for email templates path
 USER node
 
 EXPOSE 8080
