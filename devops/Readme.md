@@ -1,8 +1,8 @@
 # 🚀 Space2Study — Infrastructure as Code (IaaC)
 
-This repository contains the complete infrastructure, backend, and frontend code for the **Space2Study** platform. The project utilizes a modern DevSecOps approach, deploying a fully isolated, 3-tier architecture locally using Vagrant and Ansible.
-
----
+## 📌 Deployment Methods
+* [Method 1: Vagrant + Ansible (Without Docker)](#-method-1-vagrant--ansible-without-docker)
+* [Method 2: Vagrant + Ansible + Docker](#-method-2-vagrant--ansible--docker)
 
 ## 🏗️ Architecture & Topology
 
@@ -24,6 +24,7 @@ Before deploying the infrastructure, ensure you have the following installed on 
 * **Ansible** (Configuration Management)
 
 ---
+## 💻 Method 1: Vagrant + Ansible (Without Docker)
 
 ## 🚀 First-Time Deployment
 
@@ -38,19 +39,32 @@ To provision the infrastructure from scratch, navigate to the root directory (wh
 
 ## 🚀 Deployment After VMs Recreation
 
-1. **Boot the VMs:**
+1. **Move to folder**
+   ```bash
+   cd devops/Infrastructure/without_docker
+2. **Boot the VMs:**
    ```bash
    vagrant up
-2. **Deleting old ssh connections**
+3. **Deleting old ssh connections**
    ```bash
    ssh-keygen -f "/home/redict/.ssh/known_hosts" -R "192.168.56.10"
    ssh-keygen -f "/home/redict/.ssh/known_hosts" -R "192.168.56.11"
    ssh-keygen -f "/home/redict/.ssh/known_hosts" -R "192.168.56.12"
-3. **Setting right permissions**
+4. **Setting right permissions**
    ```bash
    chmod 600 devops/Infrastructure/without_docker/.vagrant/machines/database/virtualbox/private_key
    chmod 600 devops/Infrastructure/without_docker/.vagrant/machines/frontend/virtualbox/private_key
    chmod 600 devops/Infrastructure/without_docker/.vagrant/machines/backend/virtualbox/private_key
-4. **Configure VMs with Ansible playbooks**
+5. **Configure VMs with Ansible playbooks**
    ```bash
    ansible-playbook -i devops/Configuration\ Management/ansible/inventories/local/hosts.ini devops/Configuration\ Management/ansible/site.yml --ask-vault-pass
+
+## 🐳 Method 2: Vagrant + Ansible + Docker
+
+# 🚀 Automated Deployment
+1. **Move to folder**
+   ```bash
+   cd devops/Infrastructure/with_docker
+2. **Boot and Provision:**
+   ```bash
+   vagrant up
