@@ -4,12 +4,16 @@ WORKDIR /app
 
 RUN chown -R node:node /app
 
-COPY package*.json ./
-RUN npm install --legacy-peer-deps
-
-COPY . .
-RUN ln -s /app/src/emails /app/emails
 USER node
+
+COPY --chown=node:node package*.json ./
+
+RUN npm ci --legacy-peer-deps
+
+COPY --chown=node:node . .
+
+# Email path fix
+RUN ln -s /app/src/emails /app/emails
 
 EXPOSE 8080
 
