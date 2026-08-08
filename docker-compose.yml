@@ -1,9 +1,20 @@
+networks:
+  frontend_net:
+    driver: bridge
+  backend_net:
+    driver: bridge
+  db_net:
+    driver: bridge
+
+volumes:
+  mongodb_data:
+
 services:
   database:
     image: mongo:latest
     container_name: space2study-database
     networks:
-      - space_net
+      - db_net
     volumes:
       - mongodb_data:/data/db
     restart: unless-stopped
@@ -12,13 +23,27 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_PATH: ${VITE_API_BASE_PATH}
+    container_name: space2study-frontend
+    networks:
+      - frontend_net
+    env_file:
+      - ./frontend/.env
+    restart: unless-stopped
 
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     networks:
-      - space_net
+      - backend_net
+      - db_net
     expose:
       - "8080"
     depends_on:
@@ -31,37 +56,17 @@ services:
     restart: unless-stopped
 
   loadbalancer:
-    image: nginx:alpine
+    image: nginxinc/nginx-unprivileged:alpine
     container_name: space2study-loadbalancer
     networks:
-      - space_net
+      - frontend_net
+      - backend_net
     ports:
-      - "8080:8080"
+      - "80:8080"
     volumes:
       - ./devops/loadbalancer/nginx-lb.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       - backend
-    restart: unless-stopped
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        VITE_API_BASE_PATH: ${VITE_API_BASE_PATH}
-    container_name: space2study-frontend
-    networks:
-      - space_net
-    ports:
-      - "3000:3000"
-    env_file:
-      - ./frontend/.env
-    depends_on:
-      - loadbalancer
+      - frontend
     restart: unless-stopped
 
-networks:
-  space_net:
-    driver: bridge
-
-volumes:
-  mongodb_data:

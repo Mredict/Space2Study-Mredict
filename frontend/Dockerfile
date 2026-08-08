@@ -2,22 +2,20 @@ FROM node:18 AS builder
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y xdg-utils
-
 COPY package*.json ./
 
-RUN npm install --legacy-peer-deps --ignore-scripts 
+RUN npm ci --legacy-peer-deps --ignore-scripts
 
 COPY . .
 
 RUN npm run build
 
-FROM nginx:alpine
+FROM nginxinc/nginx-unprivileged:alpine
 
-COPY --from=builder /app/dist /var/www/frontend
+COPY --chown=101:101 --from=builder /app/dist /usr/share/nginx/html
 
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-EXPOSE 3000
+EXPOSE 8080
 
 CMD ["nginx", "-g", "daemon off;"]

@@ -1,23 +1,23 @@
 - name: Create directory for Docker GPG key
-  file:
+  ansible.builtin.file:
     path: /etc/apt/keyrings
     state: directory
     mode: '0755'
 
 - name: Add Docker official GPG key
-  apt_key:
+  ansible.builtin.get_url:
     url: https://download.docker.com/linux/ubuntu/gpg
-    keyring: /etc/apt/keyrings/docker.gpg
-    state: present
+    dest: /etc/apt/keyrings/docker.asc
+    mode: '0644'
 
 - name: Add Docker APT repository
-  apt_repository:
-    repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu jammy stable"
+  ansible.builtin.apt_repository:
+    repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu jammy stable"
     state: present
     filename: docker
 
 - name: Install Docker Engine and Docker Compose Plugin
-  apt:
+  ansible.builtin.apt:
     name:
       - docker-ce
       - docker-ce-cli
@@ -27,25 +27,19 @@
     update_cache: yes
 
 - name: Add vagrant user to the docker group
-  user:
+  ansible.builtin.user:
     name: vagrant
     groups: docker
     append: yes
 
 - name: Ensure Docker service is running and enabled on boot
-  service:
+  ansible.builtin.service:
     name: docker
     state: started
     enabled: yes
 
-- name: Allow incoming traffic to Node.js backend on port 8080
-  community.general.ufw:
-    rule: allow
-    port: '8080'
-    proto: tcp
-
 - name: Allow incoming traffic to Nginx on port 3000
   community.general.ufw:
     rule: allow
-    port: '3000'
+    port: '80'
     proto: tcp
