@@ -10,7 +10,6 @@ RUN npm install --legacy-peer-deps --ignore-scripts
 
 COPY . .
 
-
 RUN npm run build
 
 FROM nginx:alpine
