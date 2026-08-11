@@ -1,8 +1,10 @@
 FROM node:18-alpine
 
-WORKDIR /app
+RUN apk update && apk upgrade --no-cache
 
-RUN chown -R node:node /app
+RUN mkdir -p /app && chown -R node:node /app
+
+WORKDIR /app
 
 USER node
 

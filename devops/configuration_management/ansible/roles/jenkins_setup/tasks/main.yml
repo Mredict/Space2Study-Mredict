@@ -1,0 +1,67 @@
+---
+- name: Install prerequisite packages
+  ansible.builtin.apt:
+    name:
+      - fontconfig
+      - openjdk-21-jre
+    state: present
+    update_cache: true
+
+- name: Ensure APT keyrings directory exists
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+
+- name: Download Jenkins GPG key
+  ansible.builtin.get_url:
+    url: "{{ jenkins_gpg_url }}"
+    dest: /etc/apt/keyrings/jenkins-keyring.asc
+    mode: '0644'
+
+- name: Add Jenkins APT repository
+  ansible.builtin.apt_repository:
+    repo: "{{ jenkins_repo_url }}"
+    state: present
+    filename: jenkins
+    update_cache: true
+
+- name: Install Jenkins package
+  ansible.builtin.apt:
+    name: jenkins
+    state: present
+
+- name: Ensure Jenkins service is running and enabled
+  ansible.builtin.service:
+    name: jenkins
+    state: started
+    enabled: true
+
+- name: Allow Jenkins traffic through UFW firewall
+  community.general.ufw:
+    rule: allow
+    port: '8080'
+    proto: tcp
+
+- name: Check if Jenkins initial admin password file exists
+  ansible.builtin.stat:
+    path: /var/lib/jenkins/secrets/initialAdminPassword
+  register: admin_password_file
+
+- name: Handle initial admin password retrieval
+  when: admin_password_file.stat.exists
+  block:
+    - name: Fetch initial admin password
+      ansible.builtin.slurp:
+        src: /var/lib/jenkins/secrets/initialAdminPassword
+      register: jenkins_admin_password
+      no_log: true
+
+    - name: Print Jenkins initial admin password
+      ansible.builtin.debug:
+        msg: "JENKINS INITIAL ADMIN PASSWORD: {{ jenkins_admin_password['content'] | b64decode | trim }}"
+
+- name: Inform operator if setup was already completed
+  when: not admin_password_file.stat.exists
+  ansible.builtin.debug:
+    msg: "Initial admin password file not found. It shouldn't be found if setup has already been completed."

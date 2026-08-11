@@ -38,8 +38,17 @@
     state: started
     enabled: yes
 
-- name: Allow incoming traffic to Nginx on port 3000
+- name: Allow incoming traffic to Nginx on port 80
   community.general.ufw:
     rule: allow
     port: '80'
     proto: tcp
+
+- name: Configure Docker to trust the local insecure registry
+  ansible.builtin.copy:
+    dest: /etc/docker/daemon.json
+    content: |
+      {
+        "insecure-registries": ["192.168.56.15:5000"]
+      }
+  notify: Restart Docker

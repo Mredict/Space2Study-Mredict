@@ -1,20 +1,59 @@
 Vagrant.configure("2") do |config|
   config.vm.box = "ubuntu/jammy64"
-  config.vm.network "private_network", ip: "192.168.56.20"
-  
-  config.vm.network "forwarded_port", guest: 80, host: 80
 
-  config.vm.synced_folder "../../../", "/workspace"
-
-  config.vm.provider "virtualbox" do |vb|
-    vb.memory = "4096"
-    vb.cpus = 2
-    vb.name = "Space2Study-Docker-Node"
-  end
-  config.vm.provision "ansible_local" do |ansible|
+  # 1. Jenkins Controller
+  config.vm.define "jenkins" do |jenkins|
+    jenkins.vm.hostname = "Space2Study-Jenkins"
+    jenkins.vm.network "private_network", ip: "192.168.56.10"
     
-    ansible.provisioning_path = "/workspace/devops/configuration_management/ansible"
-    ansible.playbook = "docker-site.yml"
-    ansible.become = true
- end
+    jenkins.vm.network "forwarded_port", guest: 8080, host: 8080
+    jenkins.vm.network "forwarded_port", guest: 9000, host: 9000
+
+    jenkins.vm.synced_folder "../../configuration_management/", "/workspace", type: "rsync"
+
+    jenkins.vm.provider "virtualbox" do |vb|
+      vb.memory = "6144"
+      vb.cpus = 2
+    end
+
+    jenkins.vm.provision "ansible_local" do |ansible|
+      ansible.provisioning_path = "/workspace/ansible"
+      ansible.playbook = "jenkins.yml"
+      ansible.become = true
+    end
+  end
+
+
+  # 2. Jenkins Agent
+  config.vm.define "agent" do |agent|
+    agent.vm.hostname = "Space2Study-Agent"
+    agent.vm.network "private_network", ip: "192.168.56.15"
+    agent.vm.synced_folder "../../configuration_management/", "/workspace", type: "rsync"
+    agent.vm.provider "virtualbox" do |vb|
+        vb.memory = "8096"
+        vb.cpus = 4 
+    end
+    agent.vm.provision "ansible_local" do |ansible|
+      ansible.provisioning_path = "/workspace/ansible"
+      ansible.playbook = "agent.yml"
+      ansible.become = true
+    end
+  end
+
+  # 3. App Server
+  config.vm.define "app" do |app|
+    app.vm.hostname = "Space2Study-App"
+    app.vm.network "private_network", ip: "192.168.56.20"
+    app.vm.network "forwarded_port", guest: 80, host: 80
+    app.vm.synced_folder "../../configuration_management/", "/workspace", type: "rsync"
+    app.vm.provider "virtualbox" do |vb|
+      vb.memory = "4096"
+      vb.cpus = 2
+    end
+    app.vm.provision "ansible_local" do |ansible|
+      ansible.provisioning_path = "/workspace/ansible"
+      ansible.playbook = "docker.yml"
+      ansible.become = true
+    end
+  end
 end

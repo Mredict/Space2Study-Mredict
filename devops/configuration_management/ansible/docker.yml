@@ -5,4 +5,3 @@
   roles:
     - common
     - docker_setup
-    - docker_deploy

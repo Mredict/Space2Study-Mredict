@@ -1,0 +1,7 @@
+---
+- name: Provision Jenkins Agent and Registry
+  hosts: all
+  become: yes
+  roles:
+    - common
+    - agent_setup

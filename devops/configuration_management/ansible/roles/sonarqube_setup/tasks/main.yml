@@ -1,0 +1,34 @@
+- name: Allow SonarQube traffic through UFW firewall
+  community.general.ufw:
+    rule: allow
+    port: '9000'
+    proto: tcp
+
+- name: Configure kernel parameters for Elasticsearch
+  ansible.posix.sysctl:
+    name: vm.max_map_count
+    value: '262144'
+    state: present
+    reload: true
+
+- name: Create persistent Docker volumes
+  community.docker.docker_volume:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - sonarqube_data
+    - sonarqube_extensions
+    - sonarqube_logs
+
+- name: Run SonarQube Container
+  community.docker.docker_container:
+    name: sonarqube
+    image: "sonarqube:{{ sonarqube_version }}"
+    state: started
+    restart_policy: unless-stopped
+    ports:
+      - "9000:9000"
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_extensions:/opt/sonarqube/extensions
+      - sonarqube_logs:/opt/sonarqube/logs

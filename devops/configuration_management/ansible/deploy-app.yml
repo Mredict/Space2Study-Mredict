@@ -1,0 +1,76 @@
+---
+- name: Deploy Application Stack via CI/CD
+  hosts: app_servers
+  become: true
+  serial: 1
+
+  vars:
+    app_dir: "/opt/Space2Study"
+    docker_network: "space2study_net"
+
+  handlers:
+    - name: Reload Nginx Container
+      community.docker.docker_container_exec:
+        container: space2study-nginx
+        command: nginx -s reload
+      listen: "reload nginx"
+
+  tasks:
+    - name: Ensure target directories exist
+      ansible.builtin.file:
+        path: "{{ app_dir }}/{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      loop:
+        - ""
+        - backend
+        - frontend
+
+    - name: Copy docker-compose.yml to App Server
+      ansible.builtin.copy:
+        src: "{{ workspace_path }}/docker-compose.yml"
+        dest: "{{ app_dir }}/docker-compose.yml"
+        owner: root
+        group: root
+        mode: '0644'
+      register: compose_file
+
+    - name: Copy Nginx configuration
+      ansible.builtin.copy:
+        src: "{{ workspace_path }}/devops/loadbalancer/nginx-lb.conf"
+        dest: "{{ app_dir }}/nginx-lb.conf"
+        owner: root
+        group: root
+        mode: '0644'
+      notify: "reload nginx"
+
+    - name: Copy .env files to App Server
+      ansible.builtin.copy:
+        src: "{{ workspace_path }}/{{ item }}"
+        dest: "{{ app_dir }}/{{ item }}"
+        owner: root
+        group: root
+        mode: '0600'
+      loop:
+        - backend/.env
+        - frontend/.env
+        - .env
+      register: env_files
+
+
+    - name: Deploy Docker Compose stack
+      community.docker.docker_compose_v2:
+        project_src: "{{ app_dir }}"
+        state: present
+        pull: always
+        build: never
+        remove_orphans: true
+      register: compose_output
+      environment:
+        IMAGE_TAG: "{{ image_tag | default('latest') }}"
+        REGISTRY: "{{ registry | default('192.168.56.15:5000') }}"
+
+    - name: Flush handlers to execute Nginx reload immediately if needed
+      ansible.builtin.meta: flush_handlers
