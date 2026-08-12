@@ -2,7 +2,7 @@ pipeline {
     agent { label 'agent-node' } 
 
     parameters {
-        string(name: 'BRANCH', defaultValue: 'CI/CD', description: 'Git branch to build')
+        string(name: 'BRANCH', defaultValue: 'main', description: 'Git branch to build')
         choice(name: 'ENV', choices: ['dev', 'staging', 'prod'], description: 'Target Deployment Environment')
         string(name: 'DEPLOY_TARGET', defaultValue: '192.168.56.20', description: 'Target Server IP')
         string(name: 'REGISTRY', defaultValue: '192.168.56.15:5000', description: 'Docker Registry URI')

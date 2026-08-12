@@ -12,10 +12,13 @@ RUN npm run build
 
 FROM nginxinc/nginx-unprivileged:alpine
 
-COPY --chown=101:101 --from=builder /app/dist /usr/share/nginx/html
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-COPY --chown=101:101 nginx.conf /etc/nginx/conf.d/default.conf
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
+RUN chmod -R 555 /usr/share/nginx/html /etc/nginx/conf.d/default.conf
+
+USER 101
 EXPOSE 8080
 
 CMD ["nginx", "-g", "daemon off;"]
