@@ -1,22 +1,30 @@
-FROM node:18-alpine
-
-RUN apk update && apk upgrade --no-cache
-
-RUN mkdir -p /app && chown -R node:node /app
+FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-USER node
-
-COPY --chown=node:node package*.json ./
-
+COPY package*.json ./
 RUN npm ci --legacy-peer-deps
 
-COPY --chown=node:node . .
+COPY . .
+RUN npm prune --production
 
-# Email path fix
+FROM node:18-alpine AS runner
+
+ENV NODE_ENV=production
+WORKDIR /app
+
+RUN apk update && apk upgrade --no-cache
+
+COPY --chown=node:node --from=builder /app/node_modules ./node_modules
+COPY --chown=node:node --from=builder /app/package*.json ./
+COPY --chown=node:node --from=builder /app/src ./src
+
+# Application symlink Fix
 RUN ln -s /app/src/emails /app/emails
+
+USER node
 
 EXPOSE 8080
 
 CMD ["node", "src/app.js"]
+
