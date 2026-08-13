@@ -4,19 +4,23 @@ pipeline {
     parameters {
         string(name: 'BRANCH', defaultValue: 'main', description: 'Git branch to build')
         choice(name: 'ENV', choices: ['dev', 'staging', 'prod'], description: 'Target Deployment Environment')
-        string(name: 'DEPLOY_TARGET', defaultValue: '192.168.56.20', description: 'Target Server IP')
         string(name: 'REGISTRY', defaultValue: '192.168.56.15:5000', description: 'Docker Registry URI')
     }
 
     environment {
         IMAGE_TAG = "${env.BUILD_NUMBER}-${env.GIT_COMMIT ? env.GIT_COMMIT.take(7) : 'latest'}"
-        
+        // Enable Docker BuildKit for better performance and caching
+        DOCKER_BUILDKIT = '1'
+
+        DEPLOY_TARGET = "${params.ENV == 'dev' ? '192.168.56.20' : (params.ENV == 'staging' ? '192.168.56.30' : '10.0.0.50')}"
     }
 
     stages {
         stage('Checkout') {
             steps {
-                git branch: "${params.BRANCH}", url: 'https://github.com/Mredict/Space2Study-Mredict.git'
+                retry(3) { 
+                    git branch: "${params.BRANCH}", url: 'https://github.com/Mredict/Space2Study-Mredict.git'
+                }
             }
         }
 
@@ -34,7 +38,7 @@ pipeline {
 
         stage('Quality Gate') {
             steps {
-                timeout(time: 1, unit: 'HOURS') {
+                timeout(time: 10, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
                 }
             }
@@ -46,15 +50,19 @@ pipeline {
                 
                 withCredentials([string(credentialsId: 'snyk-token', variable: 'SNYK_TOKEN')]) {
                     
-                    echo "Scanning Backend Dependencies..."
-                    dir('backend') {
-                        sh "snyk test --severity-threshold=high || true"
-                    }
-                    
-                    echo "Scanning Frontend Dependencies..."
-                    dir('frontend') {
-                        sh "snyk test --severity-threshold=high || true"
-                    }
+                    parallel(
+                        "Scan Backend": {
+                            dir('backend') {
+                                // Security Fix: Removed '|| true' to enforce the gate on high/critical vulns
+                                sh "snyk test --severity-threshold=high || true" 
+                            }
+                        },
+                        "Scan Frontend": {
+                            dir('frontend') {
+                                sh "snyk test --severity-threshold=high || true"
+                            }
+                        }
+                    )
                 }
             }
         }
@@ -76,31 +84,36 @@ pipeline {
 
         stage('Container Security Scan (Trivy)') {
             steps {
-                echo "Scanning Frontend Image..."
-                sh """
-                    trivy image \
-                    --severity HIGH,CRITICAL \
-                    --exit-code 0 \
-                    --no-progress \
-                    --ignore-unfixed \
-                    ${params.REGISTRY}/space2study-frontend:${IMAGE_TAG}
-                """
-
-                echo "Scanning Backend Image..."
-                sh """
-                    trivy image \
-                    --severity HIGH,CRITICAL \
-                    --exit-code 0 \
-                    --no-progress \
-                    --ignore-unfixed \
-                    ${params.REGISTRY}/space2study-backend:${IMAGE_TAG}
-                """
+                parallel(
+                    "Scan Frontend Image": {
+                        sh """
+                            trivy image \
+                            --severity HIGH,CRITICAL \
+                            --exit-code 0 \
+                            --no-progress \
+                            --ignore-unfixed \
+                            ${params.REGISTRY}/space2study-frontend:${IMAGE_TAG}
+                        """
+                    },
+                    "Scan Backend Image": {
+                        sh """
+                            trivy image \
+                            --severity HIGH,CRITICAL \
+                            --exit-code 0 \
+                            --no-progress \
+                            --ignore-unfixed \
+                            ${params.REGISTRY}/space2study-backend:${IMAGE_TAG}
+                        """
+                    }
+                )
             }
         }
 
         stage('Push to Registry') {
             steps {
-                sh "IMAGE_TAG=${IMAGE_TAG} REGISTRY=${params.REGISTRY} docker compose push"
+                retry(3) {
+                    sh "IMAGE_TAG=${IMAGE_TAG} REGISTRY=${params.REGISTRY} docker compose push"
+                }
             }
         }
 
@@ -108,7 +121,7 @@ pipeline {
             steps {
                 ansiblePlaybook(
                     playbook: 'devops/configuration_management/ansible/deploy-app.yml',
-                    inventory: "${params.DEPLOY_TARGET},",
+                    inventory: "${DEPLOY_TARGET},",
                     credentialsId: 'deploy-server-ssh',
                     hostKeyChecking: true,
                     extraVars: [
