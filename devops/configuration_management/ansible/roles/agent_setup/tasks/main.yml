@@ -76,3 +76,19 @@
     name: trivy
     state: present
     update_cache: yes
+
+- name: Add Node.js 18.x repository
+  ansible.builtin.shell: curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+  args:
+    creates: /etc/apt/sources.list.d/nodesource.list
+
+- name: Install Node.js and npm
+  ansible.builtin.apt:
+    name: nodejs
+    state: present
+    update_cache: yes
+
+- name: Install Snyk globally via npm
+  ansible.builtin.command: npm install -g snyk
+  args:
+    creates: /usr/bin/snyk

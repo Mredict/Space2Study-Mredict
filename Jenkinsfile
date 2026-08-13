@@ -40,6 +40,25 @@ pipeline {
             }
         }
 
+        stage('SCA Security Scan (Snyk)') {
+            steps {
+                echo "🔍 Running Snyk Software Composition Analysis..."
+                
+                withCredentials([string(credentialsId: 'snyk-token', variable: 'SNYK_TOKEN')]) {
+                    
+                    echo "Scanning Backend Dependencies..."
+                    dir('backend') {
+                        sh "snyk test --severity-threshold=high"
+                    }
+                    
+                    echo "Scanning Frontend Dependencies..."
+                    dir('frontend') {
+                        sh "snyk test --severity-threshold=high"
+                    }
+                }
+            }
+        }
+
         stage('Prepare Secrets & Build Images') {
             steps {
                 withCredentials([
