@@ -31,7 +31,7 @@ pipeline {
                         -Dsonar.projectKey=Space2Study \
                         -Dsonar.projectName=Space2Study \
                         -Dsonar.sources=. \
-                        -Dsonar.exclusions=node_modules/**,**/tests/**" 
+                        -Dsonar.exclusions=**/node_modules/**,**/test/**,**/tests/**,**/*.spec.js,**/*.test.js,**/*.spec.ts,**/*.test.ts" 
                 }
             }
         }
