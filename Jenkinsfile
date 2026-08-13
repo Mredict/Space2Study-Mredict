@@ -141,7 +141,7 @@ pipeline {
             cleanWs()
         }
         success {
-            echo "✅ Deployment of ${IMAGE_TAG} to ${params.ENV} completed successfully! Access the app at http://${params.DEPLOY_TARGET}"
+            echo "✅ Deployment of ${IMAGE_TAG} to ${params.ENV} completed successfully! Access the app at http://${DEPLOY_TARGET}"
         }
         failure {
             echo "❌ Deployment to ${params.ENV} failed. Check the Jenkins console logs for details."
