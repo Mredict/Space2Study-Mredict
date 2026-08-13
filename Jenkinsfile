@@ -45,24 +45,25 @@ pipeline {
         }
 
         stage('SCA Security Scan (Snyk)') {
-            steps {
-                echo "🔍 Running Snyk Software Composition Analysis..."
-                
-                withCredentials([string(credentialsId: 'snyk-token', variable: 'SNYK_TOKEN')]) {
-                    
-                    parallel(
-                        "Scan Backend": {
-                            dir('backend') {
-                                // Security Fix: Removed '|| true' to enforce the gate on high/critical vulns
-                                sh "snyk test --severity-threshold=high || true" 
-                            }
-                        },
-                        "Scan Frontend": {
-                            dir('frontend') {
-                                sh "snyk test --severity-threshold=high || true"
-                            }
+            environment {
+                SNYK_TOKEN = credentials('snyk-token')
+            }
+            parallel {
+                stage('Scan Backend') {
+                    steps {
+                        echo "🔍 Scanning Backend Dependencies..."
+                        dir('backend') {
+                            sh "snyk test --severity-threshold=high" 
                         }
-                    )
+                    }
+                }
+                stage('Scan Frontend') {
+                    steps {
+                        echo "🔍 Scanning Frontend Dependencies..."
+                        dir('frontend') {
+                            sh "snyk test --severity-threshold=high"
+                        }
+                    }
                 }
             }
         }
