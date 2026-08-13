@@ -36,7 +36,7 @@ services:
     
   frontend:
     build: ./frontend
-    image: ${REGISTRY:-registry.space2study.internal:5000}/space2study-frontend:${IMAGE_TAG:-v1.0.0}
+    image: ${REGISTRY:-registry.space2study.internal:5000}/space2study-frontend:${IMAGE_TAG:-latest}
     container_name: space2study-frontend
     restart: unless-stopped
     read_only: true
@@ -62,7 +62,7 @@ services:
 
   backend:
     build: ./backend
-    image: ${REGISTRY:-registry.space2study.internal:5000}/space2study-backend:${IMAGE_TAG:-v1.0.0}
+    image: ${REGISTRY:-registry.space2study.internal:5000}/space2study-backend:${IMAGE_TAG:-latest}
     restart: unless-stopped
     networks:
       - backend_net
