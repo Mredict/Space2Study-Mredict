@@ -13,6 +13,8 @@ pipeline {
         DOCKER_BUILDKIT = '1'
 
         DEPLOY_TARGET = "${params.ENV == 'dev' ? '192.168.56.20' : (params.ENV == 'staging' ? '192.168.56.30' : '10.0.0.50')}"
+
+        ANSIBLE_HOST_KEY_CHECKING = 'False'
     }
 
     stages {
