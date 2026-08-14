@@ -17,14 +17,14 @@ RUN apk update && apk upgrade --no-cache
 
 COPY --chmod=555 --from=builder /app/node_modules ./node_modules
 COPY --chmod=555 --from=builder /app/package*.json ./
-COPY --chmod=555 --from=builder /app/src ./src
+COPY --chmod=555 --from=builder /app/src ./
 
 # Application symlink Fix
-RUN ln -s /app/src/emails /app/emails
+RUN ln -s /app/emails /app/src/emails || true
 
 USER node
 
 EXPOSE 8080
 
-CMD ["node", "src/app.js"]
+CMD ["node", "app.js"]
 
