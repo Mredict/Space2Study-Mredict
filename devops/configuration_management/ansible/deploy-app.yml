@@ -10,7 +10,7 @@
   handlers:
     - name: Reload Nginx Container
       community.docker.docker_container_exec:
-        container: space2study-nginx
+        container: space2study-loadbalancer
         command: nginx -s reload
       listen: "reload nginx"
 
