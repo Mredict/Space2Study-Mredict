@@ -122,7 +122,7 @@ pipeline {
                     playbook: 'devops/configuration_management/ansible/deploy-app.yml',
                     inventory: "${DEPLOY_TARGET},",
                     credentialsId: 'deploy-server-ssh',
-                    hostKeyChecking: true,
+                    hostKeyChecking: false,
                     extraVars: [
                         workspace_path: "${env.WORKSPACE}",
                         image_tag: "${IMAGE_TAG}",
