@@ -1,8 +1,7 @@
 ---
 - name: Deploy Application Stack via CI/CD
-  hosts: app_servers
+  hosts: all
   become: true
-  serial: 1
 
   vars:
     app_dir: "/opt/Space2Study"
