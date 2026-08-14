@@ -8,6 +8,10 @@ RUN npm ci --legacy-peer-deps --ignore-scripts
 
 COPY . .
 
+ARG VITE_API_BASE_PATH=/api/
+
+ENV VITE_API_BASE_PATH=$VITE_API_BASE_PATH
+
 RUN npm run build
 
 FROM nginxinc/nginx-unprivileged:alpine

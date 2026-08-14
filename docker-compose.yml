@@ -35,7 +35,10 @@ services:
           memory: 256M
     
   frontend:
-    build: ./frontend
+    build: 
+      context: ./frontend
+      args:
+        - VITE_API_BASE_PATH=/api/
     image: ${REGISTRY:-registry.space2study.internal:5000}/space2study-frontend:${IMAGE_TAG:-latest}
     container_name: space2study-frontend
     restart: unless-stopped
