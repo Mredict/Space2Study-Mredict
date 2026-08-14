@@ -17,7 +17,7 @@ RUN apk update && apk upgrade --no-cache
 
 COPY --chmod=555 --from=builder /app/node_modules ./node_modules
 COPY --chmod=555 --from=builder /app/package*.json ./
-COPY --chmod=555 --from=builder /app/src ./src
+COPY --chmod=555 --from=builder /app/ ./
 
 # Application symlink Fix
 RUN ln -s /app/src/emails /app/emails
