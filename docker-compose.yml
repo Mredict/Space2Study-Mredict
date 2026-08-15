@@ -184,6 +184,11 @@ services:
       - /tmp
       - /var/cache/nginx
       - /var/run
+    depends_on:
+      - backend-1
+      - backend-2
+      - backend-3
+      - frontend
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/ || exit 1"]
       interval: 10s
