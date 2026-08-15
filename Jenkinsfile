@@ -84,26 +84,30 @@ pipeline {
         }
 
         stage('Container Security Scan (Trivy)') {
-            steps {
-                "Scan Frontend Image": {
-                    sh """
-                        trivy image \
-                        --severity HIGH,CRITICAL \
-                        --exit-code 0 \
-                        --no-progress \
-                        --ignore-unfixed \
-                        ${params.REGISTRY}/space2study-frontend:${IMAGE_TAG}
-                    """
-                },
-                "Scan Backend Image": {
-                    sh """
-                        trivy image \
-                        --severity HIGH,CRITICAL \
-                        --exit-code 0 \
-                        --no-progress \
-                        --ignore-unfixed \
-                        ${params.REGISTRY}/space2study-backend:${IMAGE_TAG}
-                    """
+            parallel {
+                stage('Scan Frontend Image') {
+                    steps {
+                        sh """
+                            trivy image \
+                            --severity HIGH,CRITICAL \
+                            --exit-code 0 \
+                            --no-progress \
+                            --ignore-unfixed \
+                            ${params.REGISTRY}/space2study-frontend:${IMAGE_TAG}
+                        """
+                    }
+                }
+                stage('Scan Backend Image') {
+                    steps {
+                        sh """
+                            trivy image \
+                            --severity HIGH,CRITICAL \
+                            --exit-code 0 \
+                            --no-progress \
+                            --ignore-unfixed \
+                            ${params.REGISTRY}/space2study-backend:${IMAGE_TAG}
+                        """
+                    }
                 }
             }
         }
