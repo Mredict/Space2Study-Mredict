@@ -83,6 +83,12 @@ pipeline {
             }
         }
 
+        stage('Trivy cache cleanup') {
+            steps {
+                sh 'trivy clean --all'
+            }
+        }
+        
         stage('Container Security Scan (Trivy)') {
             steps {
                 parallel(
