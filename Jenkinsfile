@@ -83,36 +83,28 @@ pipeline {
             }
         }
 
-        stage('Trivy cache cleanup') {
-            steps {
-                sh 'trivy clean --all'
-            }
-        }
-        
         stage('Container Security Scan (Trivy)') {
             steps {
-                parallel(
-                    "Scan Frontend Image": {
-                        sh """
-                            trivy image \
-                            --severity HIGH,CRITICAL \
-                            --exit-code 0 \
-                            --no-progress \
-                            --ignore-unfixed \
-                            ${params.REGISTRY}/space2study-frontend:${IMAGE_TAG}
-                        """
-                    },
-                    "Scan Backend Image": {
-                        sh """
-                            trivy image \
-                            --severity HIGH,CRITICAL \
-                            --exit-code 0 \
-                            --no-progress \
-                            --ignore-unfixed \
-                            ${params.REGISTRY}/space2study-backend:${IMAGE_TAG}
-                        """
-                    }
-                )
+                "Scan Frontend Image": {
+                    sh """
+                        trivy image \
+                        --severity HIGH,CRITICAL \
+                        --exit-code 0 \
+                        --no-progress \
+                        --ignore-unfixed \
+                        ${params.REGISTRY}/space2study-frontend:${IMAGE_TAG}
+                    """
+                },
+                "Scan Backend Image": {
+                    sh """
+                        trivy image \
+                        --severity HIGH,CRITICAL \
+                        --exit-code 0 \
+                        --no-progress \
+                        --ignore-unfixed \
+                        ${params.REGISTRY}/space2study-backend:${IMAGE_TAG}
+                    """
+                }
             }
         }
 
