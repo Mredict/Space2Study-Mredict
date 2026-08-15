@@ -61,3 +61,5 @@
       environment:
         IMAGE_TAG: "{{ image_tag | default('latest') }}"
         REGISTRY: "{{ registry | default('192.168.56.15:5000') }}"
+        MONGO_USER: "admin"
+        MONGO_PASS: "supersecretpassword123"

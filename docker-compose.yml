@@ -59,7 +59,7 @@ services:
       - /tmp
       - /var/cache/nginx
     healthcheck:
-      test: ["CMD", "/usr/bin/healthcheck"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/ || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -185,7 +185,7 @@ services:
       - /var/cache/nginx
       - /var/run
     healthcheck:
-      test: ["CMD", "/usr/bin/healthcheck"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/ || exit 1"]
       interval: 10s
       timeout: 3s
       retries: 3
