@@ -7,13 +7,6 @@
     app_dir: "/opt/Space2Study"
     docker_network: "space2study_net"
 
-  handlers:
-    - name: Reload Nginx Container
-      community.docker.docker_container_exec:
-        container: space2study-loadbalancer
-        command: nginx -s reload
-      listen: "reload nginx"
-
   tasks:
     - name: Ensure target directories exist
       ansible.builtin.file:
@@ -34,7 +27,6 @@
         owner: root
         group: root
         mode: '0644'
-      register: compose_file
 
     - name: Copy Nginx configuration
       ansible.builtin.copy:
@@ -43,7 +35,7 @@
         owner: root
         group: root
         mode: '0644'
-      notify: "reload nginx"
+      register: nginx_config
 
     - name: Copy .env files to App Server
       ansible.builtin.copy:
@@ -58,7 +50,6 @@
         - .env
       register: env_files
 
-
     - name: Deploy Docker Compose stack
       community.docker.docker_compose_v2:
         project_src: "{{ app_dir }}"
@@ -66,10 +57,7 @@
         pull: always
         build: never
         remove_orphans: true
-      register: compose_output
+        recreate: "{{ 'always' if (nginx_config.changed or env_files.changed) else 'never' }}"
       environment:
         IMAGE_TAG: "{{ image_tag | default('latest') }}"
         REGISTRY: "{{ registry | default('192.168.56.15:5000') }}"
-
-    - name: Flush handlers to execute Nginx reload immediately if needed
-      ansible.builtin.meta: flush_handlers
