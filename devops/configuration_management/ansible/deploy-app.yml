@@ -47,15 +47,8 @@
       loop:
         - backend/.env
         - frontend/.env
+        - .env
       register: env_files
-
-    - name: Create root .env file for Docker Compose interpolation
-      ansible.builtin.copy:
-        dest: "{{ app_dir }}/.env"
-        content: |
-          MONGO_USER=admin
-          MONGO_PASS=supersecretpassword123
-        mode: '0600'
 
     - name: Deploy Docker Compose stack
       community.docker.docker_compose_v2:

@@ -26,6 +26,30 @@ pipeline {
             }
         }
 
+        stage('Static Code & Security Checks') {
+            parallel {
+                stage('Secret Scanning (Gitleaks)') {
+                    steps {
+                        echo "🔍 Scanning for hardcoded secrets..."
+                        sh 'gitleaks detect --source . --report-format json --report-path gitleaks.json --no-banner || true'
+                    }
+                }
+                stage('Dockerfile Linting (Hadolint)') {
+                    steps {
+                        echo "📝 Linting Dockerfiles..."
+                        sh 'hadolint backend/Dockerfile'
+                        sh 'hadolint frontend/Dockerfile'
+                    }
+                }
+            }
+        }
+
+        stage('Ansible Lint') {
+            steps {
+                sh 'ansible-lint devops/configuration_management/ansible/'
+            }
+        }
+
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('SonarQube') {
@@ -72,11 +96,12 @@ pipeline {
             steps {
                 withCredentials([
                     file(credentialsId: 'backend-env-file', variable: 'BACKEND_ENV'),
-                    file(credentialsId: 'frontend-env-file', variable: 'FRONTEND_ENV')
+                    file(credentialsId: 'frontend-env-file', variable: 'FRONTEND_ENV'),
+                    file(credentialsId: 'global-env-file', variable: 'ROOT_ENV')
                 ]) {
                     sh 'cp $BACKEND_ENV backend/.env'
                     sh 'cp $FRONTEND_ENV frontend/.env'
-                    sh 'cp $FRONTEND_ENV .env' 
+                    sh 'cp $ROOT_ENV .env'
 
                     sh "IMAGE_TAG=${IMAGE_TAG} REGISTRY=${params.REGISTRY} docker compose build"
                 }
@@ -88,11 +113,15 @@ pipeline {
                 stage('Scan Frontend Image') {
                     steps {
                         sh """
-                            trivy image \
+                            docker run --rm \
+                            -v /var/run/docker.sock:/var/run/docker.sock \
+                            -v /root/.cache/trivy:/root/.cache/trivy \
+                            aquasec/trivy:latest image \
                             --severity HIGH,CRITICAL \
                             --exit-code 0 \
                             --no-progress \
                             --ignore-unfixed \
+                            --db-repository public.ecr.aws/aquasecurity/trivy-db:2 \
                             ${params.REGISTRY}/space2study-frontend:${IMAGE_TAG}
                         """
                     }
@@ -100,12 +129,16 @@ pipeline {
                 stage('Scan Backend Image') {
                     steps {
                         sh """
-                            trivy image \
+                            docker run --rm \
+                            -v /var/run/docker.sock:/var/run/docker.sock \
+                            -v /root/.cache/trivy:/root/.cache/trivy \
+                            aquasec/trivy:latest image \
                             --severity HIGH,CRITICAL \
                             --exit-code 0 \
                             --no-progress \
                             --ignore-unfixed \
-                            ${params.REGISTRY}/space2study-backend:${IMAGE_TAG}
+                            --db-repository public.ecr.aws/aquasecurity/trivy-db:2 \
+                            ${params.REGISTRY}/space2study-frontend:${IMAGE_TAG}
                         """
                     }
                 }

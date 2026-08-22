@@ -1,0 +1,52 @@
+global:
+  scrape_interval:     15s
+  evaluation_interval: 15s
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - alertmanager:9093
+
+scrape_configs:
+  # --- PROMETHEUS SELF MONITORING ---
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # --- JENKINS CONTROLLER (192.168.56.10) ---
+  - job_name: "jenkins_controller_node"
+    static_configs:
+      - targets: ["192.168.56.10:9100"]
+        labels:
+          node: "jenkins-controller"
+
+  - job_name: "jenkins_app"
+    static_configs:
+      - targets: ["192.168.56.10:8080"] # Adjust if Jenkins uses a different port/metrics path
+
+  # --- JENKINS BUILD AGENT (192.168.56.15) ---
+  - job_name: "jenkins_agent_node"
+    static_configs:
+      - targets: ["192.168.56.15:9100"]
+        labels:
+          node: "jenkins-agent"
+
+  - job_name: "jenkins_agent_cadvisor"
+    static_configs:
+      - targets: ["192.168.56.15:8081"]
+        labels:
+          node: "jenkins-agent"
+
+  # --- APPLICATION SERVER (192.168.56.20) ---
+  - job_name: "app_server_node"
+    static_configs:
+      - targets: ["192.168.56.20:9100"]
+        labels:
+          node: "app-server"
+
+  - job_name: "app_server_cadvisor"
+    static_configs:
+      - targets: ["192.168.56.20:8081"]
+        labels:
+          node: "app-server"

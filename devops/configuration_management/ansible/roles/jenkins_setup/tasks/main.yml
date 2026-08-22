@@ -46,22 +46,22 @@
 - name: Check if Jenkins initial admin password file exists
   ansible.builtin.stat:
     path: /var/lib/jenkins/secrets/initialAdminPassword
-  register: admin_password_file
+  register: jenkins_setup_admin_password_file
 
 - name: Handle initial admin password retrieval
-  when: admin_password_file.stat.exists
+  when: jenkins_setup_admin_password_file.stat.exists
   block:
     - name: Fetch initial admin password
       ansible.builtin.slurp:
         src: /var/lib/jenkins/secrets/initialAdminPassword
-      register: jenkins_admin_password
+      register: jenkins_setup_admin_password
       no_log: true
 
     - name: Print Jenkins initial admin password
       ansible.builtin.debug:
-        msg: "JENKINS INITIAL ADMIN PASSWORD: {{ jenkins_admin_password['content'] | b64decode | trim }}"
+        msg: "JENKINS INITIAL ADMIN PASSWORD: {{ jenkins_setup_admin_password['content'] | b64decode | trim }}"
 
 - name: Inform operator if setup was already completed
-  when: not admin_password_file.stat.exists
+  when: not jenkins_setup_admin_password_file.stat.exists
   ansible.builtin.debug:
     msg: "Initial admin password file not found. It shouldn't be found if setup has already been completed."

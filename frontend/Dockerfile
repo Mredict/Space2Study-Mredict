@@ -1,4 +1,4 @@
-FROM node:18-alpine AS builder
+FROM node:18-alpine3.20 AS builder
 
 WORKDIR /app
 
@@ -14,7 +14,7 @@ ENV VITE_API_BASE_PATH=$VITE_API_BASE_PATH
 
 RUN npm run build
 
-FROM nginxinc/nginx-unprivileged:alpine
+FROM nginxinc/nginx-unprivileged:alpine3.20
 
 COPY --chmod=555 --from=builder /app/dist /usr/share/nginx/html
 COPY --chmod=555 nginx.conf /etc/nginx/conf.d/default.conf

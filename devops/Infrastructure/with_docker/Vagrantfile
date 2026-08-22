@@ -47,30 +47,12 @@ Vagrant.configure("2") do |config|
     app.vm.network "forwarded_port", guest: 80, host: 80
     app.vm.synced_folder "../../configuration_management/", "/workspace", type: "rsync"
     app.vm.provider "virtualbox" do |vb|
-      vb.memory = "4096"
+      vb.memory = "6144"
       vb.cpus = 2
     end
     app.vm.provision "ansible_local" do |ansible|
       ansible.provisioning_path = "/workspace/ansible"
       ansible.playbook = "app.yml"
-      ansible.become = true
-    end
-  end
-
-  # 4. HashiCorp Vault Server
-  config.vm.define "vault" do |vault|
-    vault.vm.hostname = "Space2Study-Vault"
-    vault.vm.network "private_network", ip: "192.168.56.30"
-    vault.vm.network "forwarded_port", guest: 8200, host: 8200
-    
-    vault.vm.synced_folder "../../configuration_management/", "/workspace", type: "rsync"
-    vault.vm.provider "virtualbox" do |vb|
-      vb.memory = "2048"
-      vb.cpus = 1
-    end
-    vault.vm.provision "ansible_local" do |ansible|
-      ansible.provisioning_path = "/workspace/ansible"
-      ansible.playbook = "vault.yml"
       ansible.become = true
     end
   end

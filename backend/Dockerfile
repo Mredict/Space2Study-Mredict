@@ -1,4 +1,4 @@
-FROM node:18-alpine AS builder
+FROM node:18-alpine3.20 AS builder
 
 WORKDIR /app
 
@@ -8,7 +8,7 @@ RUN npm ci --legacy-peer-deps
 COPY . .
 RUN npm prune --production
 
-FROM node:18-alpine AS runner
+FROM node:18-alpine3.20 AS runner
 
 ENV NODE_ENV=production
 WORKDIR /app
@@ -22,7 +22,7 @@ COPY --chmod=555 --from=builder /app/ ./
 # Application symlink Fix
 RUN ln -s /app/src/emails /app/emails
 
-USER node
+USER 1000:1000
 
 EXPOSE 8080
 

@@ -5,12 +5,13 @@
       - curl
       - gnupg
     state: present
-    update_cache: yes
+    update_cache: true
 
 - name: Download MongoDB public GPG key
   ansible.builtin.get_url:
     url: https://pgp.mongodb.com/server-8.0.asc
     dest: /tmp/mongodb-server-8.0.asc
+    mode: '0644'
 
 - name: Dearmor MongoDB GPG key
   ansible.builtin.command:
@@ -23,7 +24,7 @@
     repo: "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/8.3 multiverse"
     state: present
     filename: mongodb-org-8.3
-    update_cache: yes
+    update_cache: true
 
 - name: Install MongoDB
   ansible.builtin.apt:
@@ -43,7 +44,7 @@
   ansible.builtin.systemd:
     name: mongod
     state: started
-    enabled: yes
+    enabled: true
 
 - name: Allow MongoDB traffic only from the Backend VM
   community.general.ufw:

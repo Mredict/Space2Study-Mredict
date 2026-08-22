@@ -1,12 +1,18 @@
 ---
-- name: Add Node.js 18.x repository
-  ansible.builtin.shell: curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+- name: Download Node.js 18.x setup script
+  ansible.builtin.get_url:
+    url: https://deb.nodesource.com/setup_18.x
+    dest: /tmp/nodesource_setup.sh
+    mode: '0755'
+
+- name: Run Node.js 18.x setup script
+  ansible.builtin.command: /tmp/nodesource_setup.sh
   args:
     creates: /etc/apt/sources.list.d/nodesource.list
 
 - name: Install Node.js and xdg-utils (Vite crash fix)
   ansible.builtin.apt:
-    name: 
+    name:
       - nodejs
       - xdg-utils
     state: present
@@ -20,7 +26,8 @@
   ansible.builtin.git:
     repo: "{{ repo }}"
     dest: /home/vagrant/Space2Study
-    force: yes
+    force: true
+    version: main
 
 - name: Generate .env file from template
   ansible.builtin.template:
@@ -32,19 +39,18 @@
   community.general.npm:
     path: /home/vagrant/Space2Study/frontend
     state: present
-    ignore_scripts: yes
-    production: yes
-  
+    ignore_scripts: true
+    production: true
+
 - name: Build frontend application
-  ansible.builtin.shell: npm run build
-  args:
-    chdir: /home/vagrant/Space2Study/frontend
+  ansible.builtin.command: npm run build
+  changed_when: false
 
 - name: Copy built folder to Nginx directory
   ansible.builtin.copy:
     src: /home/vagrant/Space2Study/frontend/dist/
     dest: /var/www/frontend
-    remote_src: yes
+    remote_src: true
     owner: www-data
     group: www-data
     mode: '0755'
@@ -60,7 +66,7 @@
     name: nginx
     state: restarted
     enabled: true
-  
+
 - name: Allow incoming traffic to Nginx on port 3000
   community.general.ufw:
     rule: allow

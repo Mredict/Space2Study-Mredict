@@ -1,0 +1,34 @@
+---
+- name: Ensure monitoring directory exists
+  ansible.builtin.file:
+    path: "{{ monitoring_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Render Promtail config
+  ansible.builtin.template:
+    src: promtail-config.yml.j2
+    dest: "{{ monitoring_dir }}/promtail-config.yml"
+    mode: '0644'
+  register: monitoring_agent_promtail_config
+
+- name: Render Monitoring Compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ monitoring_dir }}/docker-compose.yml"
+    mode: '0644'
+
+- name: Open UFW ports for metrics
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - 9100
+    - 8081
+
+- name: Start monitoring agents containers
+  community.docker.docker_compose_v2:
+    project_src: "{{ monitoring_dir }}"
+    state: present
+    recreate: "{{ 'always' if monitoring_agent_promtail_config.changed else 'never' }}"

@@ -1,7 +1,13 @@
 ---
 - name: Provision Jenkins Agent and Registry
   hosts: all
-  become: yes
+  become: true
+
+  vars:
+    monitoring_dir: "/opt/monitoring"
+    loki_url: "http://192.168.56.10:3100/loki/api/v1/push"
+
   roles:
     - common
     - agent_setup
+    - monitoring_agent

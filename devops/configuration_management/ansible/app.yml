@@ -1,7 +1,13 @@
 ---
 - name: Provision Space2Study with Docker
   hosts: all
-  become: yes
+  become: true
+
+  vars:
+    monitoring_dir: "/opt/monitoring"
+    loki_url: "http://192.168.56.10:3100/loki/api/v1/push"
+
   roles:
     - common
     - docker_setup
+    - monitoring_agent

@@ -1,24 +1,24 @@
 ---
 - name: Base configuration to all nodes
   hosts: all
-  become: yes
+  become: true
   roles:
     - common
 
 - name: Configure Database
   hosts: database
-  become: yes
+  become: true
   roles:
     - database
 
 - name: Configure Backend
   hosts: backend
-  become: yes
+  become: true
   roles:
     - backend
 
 - name: Configure Frontend
   hosts: frontend
-  become: yes
+  become: true
   roles:
     - frontend
