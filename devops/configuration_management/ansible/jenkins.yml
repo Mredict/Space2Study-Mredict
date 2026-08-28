@@ -6,15 +6,8 @@
   vars:
     jenkins_gpg_url: "https://pkg.jenkins.io/debian-stable/jenkins.io-2026.key"
     jenkins_repo_url: "deb [signed-by=/etc/apt/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/"
-    sonarqube_version: "10.6.0-community"
-    prometheus_config_path: "/etc/prometheus/prometheus.yml"
-    targets:
-      app: "192.168.56.20"
-      agent: "192.168.56.15"
 
   roles:
     - common
     - docker_setup
     - jenkins_setup
-    - sonarqube_setup
-    - monitoring_server

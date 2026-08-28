@@ -99,3 +99,28 @@ Space2Study-Monorepo/
     ├── .env.example
     ├── .gitignore
 ```
+
+
+                      [ HTTPS (443) ]
+                             │
+                      ┌──────▼──────┐
+                      │   AWS WAF   │
+                      └──────┬──────┘
+                             │
+                     ┌───────▼───────┐
+                     │  Public Subnet│
+                     │      ALB      │
+                     └──┬─────────┬──┘
+                        │ /       │ /api/*
+       ┌────────────────┘         └────────────────┐
+       │ (Port 8080)                               │ (Port 8080)
+┌──────▼─────────────────────┐     ┌───────────────▼────────────┐
+│ Private Subnet             │     │ Private Subnet             │
+│ ECS Service: Frontend      │     │ ECS Service: Backend       │
+│ (React - Nginx unpriv)     │     │ (Node.js - 3 Replicas)     │
+└────────────────────────────┘     └───────────────┬────────────┘
+                                                   │ (Port 27017)
+                                   ┌───────────────▼────────────┐
+                                   │ Database Isolated Subnet   │
+                                   │ DocumentDB / Managed Mongo │
+                                   └────────────────────────────┘
