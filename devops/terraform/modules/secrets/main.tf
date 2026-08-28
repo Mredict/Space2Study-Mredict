@@ -1,4 +1,3 @@
-# 1. Define the secret in Secrets Manager for the Backend
 resource "aws_secretsmanager_secret" "backend_secrets" {
   name        = "${var.project_name}-backend-secrets-${var.environment}"
   description = "Backend API Secrets (JWT, Mail, OAuth)"
@@ -7,9 +6,6 @@ resource "aws_secretsmanager_secret" "backend_secrets" {
   recovery_window_in_days = 7 
 }
 
-# 2. Store the initial empty/placeholder JSON payload
-# In a real environment, you will update these values manually in the AWS Console
-# or inject them via a secure pipeline variable so they aren't hardcoded in git.
 resource "aws_secretsmanager_secret_version" "backend_secrets_version" {
   secret_id     = aws_secretsmanager_secret.backend_secrets.id
   secret_string = jsonencode({
@@ -24,8 +20,6 @@ resource "aws_secretsmanager_secret_version" "backend_secrets_version" {
     JWT_CONFIRM_SECRET  = "placeholder_or_injected_at_apply"
   })
 
-  # Ignore changes so Terraform doesn't overwrite your real secrets 
-  # next time you run `terraform apply`
   lifecycle {
     ignore_changes = [secret_string]
   }
