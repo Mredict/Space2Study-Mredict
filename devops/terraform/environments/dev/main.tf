@@ -26,23 +26,27 @@ module "ecr" {
 
 # 4. Public Load Balancer
 module "alb" {
-  source          = "../../modules/alb"
-  project_name    = var.project_name
-  environment     = var.environment
-  vpc_id          = module.networking.vpc_id
-  public_subnets  = module.networking.public_subnets
-  alb_sg_id       = module.security_groups.alb_sg_id
+  source         = "../../modules/alb"
+  project_name   = var.project_name
+  environment    = var.environment
+  vpc_id         = module.networking.vpc_id
+  public_subnets = module.networking.public_subnets
+  alb_sg_id      = module.security_groups.alb_sg_id
 }
 
 # 5. Database Layer (Managed MongoDB)
 module "documentdb" {
-  source          = "../../modules/documentdb"
-  project_name    = var.project_name
-  environment     = var.environment
-  private_subnets = module.networking.private_subnets
-  db_sg_id        = module.security_groups.database_sg_id
-  db_username     = var.db_username
-  db_password     = var.db_password
+  source             = "../../modules/documentdb"
+  project_name       = var.project_name
+  environment        = var.environment
+  aws_region         = var.aws_region
+  vpc_id             = module.networking.vpc_id
+  private_subnets    = module.networking.private_subnets
+  db_sg_id           = module.security_groups.database_sg_id
+  db_username        = var.db_username
+  db_password        = var.db_password
+  ecs_cluster_id     = module.ecs.cluster_name
+  execution_role_arn = module.ecs.execution_role_arn
 }
 
 # 6. Container Orchestration (ECS Fargate)
@@ -63,12 +67,12 @@ module "ecs" {
 
 # 7. CI/CD IAM Roles
 module "iam" {
-  source                  = "../../modules/iam"
-  project_name            = var.project_name
-  environment             = var.environment
-  frontend_ecr_arn        = module.ecr.frontend_repository_arn
-  backend_ecr_arn         = module.ecr.backend_repository_arn
-  
+  source           = "../../modules/iam"
+  project_name     = var.project_name
+  environment      = var.environment
+  frontend_ecr_arn = module.ecr.frontend_repository_arn
+  backend_ecr_arn  = module.ecr.backend_repository_arn
+
   # Note: You will need to expose the service ARNs in your ecs/outputs.tf 
   frontend_ecs_service_id = module.ecs.frontend_service_arn
   backend_ecs_service_id  = module.ecs.backend_service_arn

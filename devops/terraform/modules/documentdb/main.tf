@@ -1,33 +1,82 @@
-# 1. Subnet Group for DocumentDB
-resource "aws_docdb_subnet_group" "main" {
-  name       = "${var.project_name}-docdb-subnet-group-${var.environment}"
-  subnet_ids = var.private_subnets
+# 1. CloudWatch Log Group for MongoDB
+resource "aws_cloudwatch_log_group" "mongodb" {
+  name              = "/ecs/${var.project_name}-mongodb-${var.environment}"
+  retention_in_days = 30
+}
 
-  tags = {
-    Name = "${var.project_name}-docdb-subnet-group"
+# 2. Service Discovery Private DNS (so backend can resolve mongodb.local)
+resource "aws_service_discovery_private_dns_namespace" "main" {
+  name = "local"
+  vpc  = var.vpc_id
+}
+
+resource "aws_service_discovery_service" "mongodb" {
+  name = "mongodb"
+
+  dns_config {
+    namespace_id = aws_service_discovery_private_dns_namespace.main.id
+    dns_records {
+      ttl  = 10
+      type = "A"
+    }
+  }
+
+  health_check_custom_config {
+    failure_threshold = 1
   }
 }
 
-# 2. DocumentDB Cluster
-resource "aws_docdb_cluster" "main" {
-  cluster_identifier      = "${var.project_name}-docdb-${var.environment}"
-  engine                  = "docdb"
-  master_username         = var.db_username
-  master_password         = var.db_password
-  db_subnet_group_name    = aws_docdb_subnet_group.main.name
-  vpc_security_group_ids  = [var.db_sg_id]
-  storage_encrypted       = true # DevSecOps: Enforce encryption at rest
-  skip_final_snapshot     = true # Set to false in real production
+# 3. MongoDB Task Definition
+resource "aws_ecs_task_definition" "mongodb" {
+  family                   = "${var.project_name}-mongodb-${var.environment}"
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = "512"
+  memory                   = "1024"
+  execution_role_arn       = var.execution_role_arn
 
-  tags = {
-    Name = "${var.project_name}-docdb-cluster"
-  }
+  container_definitions = jsonencode([{
+    name      = "database"
+    image     = "mongo:8.3.8-noble"
+    essential = true
+
+    portMappings = [{
+      containerPort = 27017
+      hostPort      = 27017
+      protocol      = "tcp"
+    }]
+
+    environment = [
+      { name = "MONGO_INITDB_ROOT_USERNAME", value = var.db_username },
+      { name = "MONGO_INITDB_ROOT_PASSWORD", value = var.db_password }
+    ]
+
+    logConfiguration = {
+      logDriver = "awslogs"
+      options = {
+        "awslogs-group"         = aws_cloudwatch_log_group.mongodb.name
+        "awslogs-region"        = var.aws_region
+        "awslogs-stream-prefix" = "mongodb"
+      }
+    }
+  }])
 }
 
-# 3. DocumentDB Cluster Instance
-resource "aws_docdb_cluster_instance" "cluster_instances" {
-  count              = 1 # Adjust instance count as needed
-  identifier         = "${var.project_name}-docdb-instance-${count.index}-${var.environment}"
-  cluster_identifier = aws_docdb_cluster.main.id
-  instance_class     = "db.t3.medium"
+# 4. MongoDB ECS Service in Private Subnets
+resource "aws_ecs_service" "mongodb" {
+  name            = "${var.project_name}-mongodb-${var.environment}"
+  cluster         = var.ecs_cluster_id
+  task_definition = aws_ecs_task_definition.mongodb.arn
+  desired_count   = 1
+  launch_type     = "FARGATE"
+
+  network_configuration {
+    subnets          = var.private_subnets
+    security_groups  = [var.db_sg_id]
+    assign_public_ip = false
+  }
+
+  service_registries {
+    registry_arn = aws_service_discovery_service.mongodb.arn
+  }
 }

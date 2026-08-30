@@ -25,3 +25,25 @@
     state: enabled
     direction: incoming
     policy: deny
+
+- name: Ensure unzip dependency is present
+  ansible.builtin.package:
+    name: unzip
+    state: present
+
+- name: Download and unpack AWS CLI v2 bundle
+  ansible.builtin.unarchive:
+    src: "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"
+    dest: /tmp
+    remote_src: true
+    creates: /tmp/aws/install
+
+- name: Run AWS CLI installer
+  ansible.builtin.command:
+    cmd: /tmp/aws/install --update
+    creates: /usr/local/bin/aws
+
+- name: Clean up installer temporary files
+  ansible.builtin.file:
+    path: /tmp/aws
+    state: absent

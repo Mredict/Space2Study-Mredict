@@ -8,25 +8,6 @@ resource "aws_ecs_cluster" "main" {
   }
 }
 
-resource "aws_iam_role_policy" "ecs_secrets_access" {
-  name = "${var.project_name}-ecs-secrets-access-${var.environment}"
-  role = aws_iam_role.ecs_execution_role.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "secretsmanager:GetSecretValue"
-        ]
-        # Restrict access strictly to the exact backend secrets ARN
-        Resource = [var.backend_secrets_arn]
-      }
-    ]
-  })
-}
-
 # 2. CloudWatch Log Groups for Container Logging
 resource "aws_cloudwatch_log_group" "backend" {
   name              = "/ecs/${var.project_name}-backend-${var.environment}"
@@ -197,11 +178,11 @@ resource "aws_ecs_service" "frontend" {
   load_balancer {
     target_group_arn = var.frontend_target_group_arn
     container_name   = "frontend"
-    containerPort    = 8080
+    container_port   = 8080 # Changed from containerPort to container_port
   }
 }
 
-# 8. Backend ECS Service (3 Replicas replacing backend-1, backend-2, backend-3)
+# 8. Backend ECS Service
 resource "aws_ecs_service" "backend" {
   name            = "${var.project_name}-backend-${var.environment}"
   cluster         = aws_ecs_cluster.main.id
@@ -218,6 +199,6 @@ resource "aws_ecs_service" "backend" {
   load_balancer {
     target_group_arn = var.backend_target_group_arn
     container_name   = "backend"
-    containerPort    = 8080
+    container_port   = 8080 # Changed from containerPort to container_port
   }
 }

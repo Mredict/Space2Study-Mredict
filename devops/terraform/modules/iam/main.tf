@@ -26,9 +26,9 @@ resource "aws_iam_user_policy" "jenkins_deployment_policy" {
       },
       {
         # Restrict pushing images ONLY to the Space2Study repositories
-        Sid      = "ECRPushPull"
-        Effect   = "Allow"
-        Action   = [
+        Sid    = "ECRPushPull"
+        Effect = "Allow"
+        Action = [
           "ecr:BatchCheckLayerAvailability",
           "ecr:InitiateLayerUpload",
           "ecr:UploadLayerPart",
@@ -43,9 +43,9 @@ resource "aws_iam_user_policy" "jenkins_deployment_policy" {
       },
       {
         # Restrict ECS deployments ONLY to the Space2Study services
-        Sid      = "ECSTriggerDeploy"
-        Effect   = "Allow"
-        Action   = [
+        Sid    = "ECSTriggerDeploy"
+        Effect = "Allow"
+        Action = [
           "ecs:UpdateService",
           "ecs:DescribeServices"
         ]

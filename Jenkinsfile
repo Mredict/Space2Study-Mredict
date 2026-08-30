@@ -1,26 +1,29 @@
 pipeline {
-    agent { label 'agent-node' } 
+    agent { label 'agent-node' }
 
     parameters {
         string(name: 'BRANCH', defaultValue: 'main', description: 'Git branch to build')
         choice(name: 'ENV', choices: ['dev', 'staging', 'prod'], description: 'Target Deployment Environment')
-        string(name: 'REGISTRY', defaultValue: '192.168.56.15:5000', description: 'Docker Registry URI')
+        string(name: 'AWS_REGION', defaultValue: 'eu-central-1', description: 'AWS Region')
+        string(name: 'AWS_ACCOUNT_ID', defaultValue: '456631682423', description: 'AWS Account ID')
     }
 
     environment {
         IMAGE_TAG = "${env.BUILD_NUMBER}-${env.GIT_COMMIT ? env.GIT_COMMIT.take(7) : 'latest'}"
-        // Enable Docker BuildKit for better performance and caching
         DOCKER_BUILDKIT = '1'
 
-        DEPLOY_TARGET = "${params.ENV == 'dev' ? '192.168.56.20' : (params.ENV == 'staging' ? '192.168.56.30' : '10.0.0.50')}"
+        FRONTEND_ECR = "${params.AWS_ACCOUNT_ID}.dkr.ecr.${params.AWS_REGION}.amazonaws.com/space2study-frontend-${params.ENV}"
+        BACKEND_ECR  = "${params.AWS_ACCOUNT_ID}.dkr.ecr.${params.AWS_REGION}.amazonaws.com/space2study-backend-${params.ENV}"
 
-        ANSIBLE_HOST_KEY_CHECKING = 'False'
+        ECS_CLUSTER      = "space2study-cluster-${params.ENV}"
+        FRONTEND_SERVICE = "space2study-frontend-${params.ENV}"
+        BACKEND_SERVICE  = "space2study-backend-${params.ENV}"
     }
 
     stages {
         stage('Checkout') {
             steps {
-                retry(3) { 
+                retry(3) {
                     git branch: "${params.BRANCH}", url: 'https://github.com/Mredict/Space2Study-Mredict.git'
                 }
             }
@@ -30,23 +33,20 @@ pipeline {
             parallel {
                 stage('Secret Scanning (Gitleaks)') {
                     steps {
-                        echo "🔍 Scanning for hardcoded secrets..."
                         sh 'gitleaks detect --source . --report-format json --report-path gitleaks.json --no-banner || true'
                     }
                 }
                 stage('Dockerfile Linting (Hadolint)') {
                     steps {
-                        echo "📝 Linting Dockerfiles..."
                         sh 'hadolint backend/Dockerfile'
                         sh 'hadolint frontend/Dockerfile'
                     }
                 }
-            }
-        }
-
-        stage('Ansible Lint') {
-            steps {
-                sh 'ansible-lint devops/configuration_management/ansible/'
+                stage('Terraform Security Scan') {
+                    steps {
+                        sh 'trivy config devops/terraform/ --severity HIGH,CRITICAL || true'
+                    }
+                }
             }
         }
 
@@ -75,15 +75,13 @@ pipeline {
             parallel {
                 stage('Scan Backend') {
                     steps {
-                        echo "🔍 Scanning Backend Dependencies..."
                         dir('backend') {
-                            sh "snyk test --severity-threshold=high || true" 
+                            sh "snyk test --severity-threshold=high || true"
                         }
                     }
                 }
                 stage('Scan Frontend') {
                     steps {
-                        echo "🔍 Scanning Frontend Dependencies..."
                         dir('frontend') {
                             sh "snyk test --severity-threshold=high || true"
                         }
@@ -92,19 +90,12 @@ pipeline {
             }
         }
 
-        stage('Prepare Secrets & Build Images') {
+        stage('Build Container Images') {
             steps {
-                withCredentials([
-                    file(credentialsId: 'backend-env-file', variable: 'BACKEND_ENV'),
-                    file(credentialsId: 'frontend-env-file', variable: 'FRONTEND_ENV'),
-                    file(credentialsId: 'global-env-file', variable: 'ROOT_ENV')
-                ]) {
-                    sh 'cp $BACKEND_ENV backend/.env'
-                    sh 'cp $FRONTEND_ENV frontend/.env'
-                    sh 'cp $ROOT_ENV .env'
-
-                    sh "IMAGE_TAG=${IMAGE_TAG} REGISTRY=${params.REGISTRY} docker compose build"
-                }
+                sh """
+                    docker build -t ${FRONTEND_ECR}:${IMAGE_TAG} -t ${FRONTEND_ECR}:latest ./frontend
+                    docker build -t ${BACKEND_ECR}:${IMAGE_TAG} -t ${BACKEND_ECR}:latest ./backend
+                """
             }
         }
 
@@ -121,8 +112,7 @@ pipeline {
                             --exit-code 0 \
                             --no-progress \
                             --ignore-unfixed \
-                            --db-repository public.ecr.aws/aquasecurity/trivy-db:2 \
-                            ${params.REGISTRY}/space2study-frontend:${IMAGE_TAG}
+                            ${FRONTEND_ECR}:${IMAGE_TAG}
                         """
                     }
                 }
@@ -137,46 +127,69 @@ pipeline {
                             --exit-code 0 \
                             --no-progress \
                             --ignore-unfixed \
-                            --db-repository public.ecr.aws/aquasecurity/trivy-db:2 \
-                            ${params.REGISTRY}/space2study-frontend:${IMAGE_TAG}
+                            ${BACKEND_ECR}:${IMAGE_TAG}
                         """
                     }
                 }
             }
         }
 
-        stage('Push to Registry') {
+        stage('Push to Amazon ECR') {
             steps {
-                retry(3) {
-                    sh "IMAGE_TAG=${IMAGE_TAG} REGISTRY=${params.REGISTRY} docker compose push"
+                withCredentials([usernamePassword(
+                    credentialsId: 'aws-jenkins-deployer',
+                    usernameVariable: 'AWS_ACCESS_KEY_ID',
+                    passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                )]) {
+                    sh """
+                        aws ecr get-login-password --region ${params.AWS_REGION} | \
+                        docker login --username AWS --password-stdin ${params.AWS_ACCOUNT_ID}.dkr.ecr.${params.AWS_REGION}.amazonaws.com
+
+                        docker push ${FRONTEND_ECR}:${IMAGE_TAG}
+                        docker push ${FRONTEND_ECR}:latest
+
+                        docker push ${BACKEND_ECR}:${IMAGE_TAG}
+                        docker push ${BACKEND_ECR}:latest
+                    """
                 }
             }
         }
 
-        stage('Deploy via Ansible') {
+        stage('Deploy to AWS ECS') {
             steps {
-                ansiblePlaybook(
-                    playbook: 'devops/configuration_management/ansible/deploy-app.yml',
-                    inventory: "${DEPLOY_TARGET},",
-                    credentialsId: 'deploy-server-ssh',
-                    hostKeyChecking: false,
-                    extraVars: [
-                        workspace_path: "${env.WORKSPACE}",
-                        image_tag: "${IMAGE_TAG}",
-                        target_env: "${params.ENV}"
-                    ]
-                )
+                withCredentials([usernamePassword(
+                    credentialsId: 'aws-jenkins-deployer',
+                    usernameVariable: 'AWS_ACCESS_KEY_ID',
+                    passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                )]) {
+                    sh """
+                        aws ecs update-service \
+                            --cluster ${ECS_CLUSTER} \
+                            --service ${FRONTEND_SERVICE} \
+                            --force-new-deployment \
+                            --region ${params.AWS_REGION}
+
+                        aws ecs update-service \
+                            --cluster ${ECS_CLUSTER} \
+                            --service ${BACKEND_SERVICE} \
+                            --force-new-deployment \
+                            --region ${params.AWS_REGION}
+                    """
+                }
             }
         }
     }
 
     post {
         always {
-            sh 'rm -f backend/.env frontend/.env .env'
             cleanWs()
+            sh """
+                docker rmi ${FRONTEND_ECR}:${IMAGE_TAG} ${FRONTEND_ECR}:latest || true
+                docker rmi ${BACKEND_ECR}:${IMAGE_TAG} ${BACKEND_ECR}:latest || true
+            """
         }
         success {
-            echo "✅ Deployment of ${IMAGE_TAG} to ${params.ENV} completed successfully! Access the app at http://${DEPLOY_TARGET}"
+            echo "✅ Deployment of ${IMAGE_TAG} to AWS ECS (${params.ENV}) completed successfully!"
         }
         failure {
             echo "❌ Deployment to ${params.ENV} failed. Check the Jenkins console logs for details."

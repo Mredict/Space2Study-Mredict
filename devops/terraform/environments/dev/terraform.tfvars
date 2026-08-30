@@ -1,0 +1,5 @@
+project_name = "space2study"
+environment  = "dev"
+aws_region   = "eu-central-1"
+db_username  = "dbadmin"
+db_password  = "SuperSecretPass123!"
