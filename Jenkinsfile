@@ -106,7 +106,7 @@ pipeline {
                         sh """
                             docker run --rm \
                             -v /var/run/docker.sock:/var/run/docker.sock \
-                            -v /root/.cache/trivy:/root/.cache/trivy \
+                            -v /root/.cache/trivy-frontend:/root/.cache/trivy \
                             aquasec/trivy:latest image \
                             --severity HIGH,CRITICAL \
                             --exit-code 0 \
@@ -121,7 +121,7 @@ pipeline {
                         sh """
                             docker run --rm \
                             -v /var/run/docker.sock:/var/run/docker.sock \
-                            -v /root/.cache/trivy:/root/.cache/trivy \
+                            -v /root/.cache/trivy-backend:/root/.cache/trivy \
                             aquasec/trivy:latest image \
                             --severity HIGH,CRITICAL \
                             --exit-code 0 \
