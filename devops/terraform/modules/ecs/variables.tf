@@ -19,3 +19,8 @@ variable "alb_dns_name" {
   description = "Public DNS name of the ALB used for CORS and callback URLs"
   type        = string
 }
+
+variable "app_secrets_arn" {
+  description = "ARN of the Secrets Manager secret holding application credentials"
+  type        = string
+}

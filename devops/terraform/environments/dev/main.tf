@@ -55,16 +55,17 @@ module "ecs" {
   project_name              = var.project_name
   environment               = var.environment
   aws_region                = var.aws_region
+  app_secrets_arn           = module.secrets.secret_arn
   private_subnets           = module.networking.private_subnets
   frontend_sg_id            = module.security_groups.frontend_ecs_sg_id
   backend_sg_id             = module.security_groups.backend_ecs_sg_id
-  frontend_image            = "${module.ecr.frontend_repository_url}:latest"
-  backend_image             = "${module.ecr.backend_repository_url}:latest"
+  frontend_image            = "${module.ecr.frontend_repository_url}:${var.image_tag}"
+  backend_image             = "${module.ecr.backend_repository_url}:${var.image_tag}"
   mongodb_url               = module.documentdb.mongodb_connection_string
   frontend_target_group_arn = module.alb.frontend_target_group_arn
   backend_target_group_arn  = module.alb.backend_target_group_arn
-  secret_arn                 = module.secrets.secret_arn
-  alb_dns_name               = module.alb.alb_dns_name
+  secret_arn                = module.secrets.secret_arn
+  alb_dns_name              = module.alb.alb_dns_name
 }
 
 # 7. CI/CD IAM Roles
@@ -81,17 +82,19 @@ module "iam" {
 }
 
 module "secrets" {
-  source             = "../../modules/secrets"
-  project_name       = var.project_name
-  environment        = var.environment
-  db_username        = var.db_username
-  db_password        = var.db_password
-  jwt_access_secret  = var.jwt_access_secret
-  jwt_refresh_secret = var.jwt_refresh_secret
-  jwt_reset_secret   = var.jwt_reset_secret
-  jwt_confirm_secret = var.jwt_confirm_secret
-  mail_user          = var.mail_user
-  mail_pass          = var.mail_pass
+  source              = "../../modules/secrets"
+  project_name        = var.project_name
+  environment         = var.environment
+  jwt_access_secret   = var.jwt_access_secret
+  jwt_refresh_secret  = var.jwt_refresh_secret
+  jwt_reset_secret    = var.jwt_reset_secret
+  jwt_confirm_secret  = var.jwt_confirm_secret
+  mail_user           = var.mail_user
+  mail_pass           = var.mail_pass
+  gmail_client_id     = var.gmail_client_id
+  gmail_client_secret = var.gmail_client_secret
+  gmail_refresh_token = var.gmail_refresh_token
+  gmail_redirect_uri  = var.gmail_redirect_uri
 }
 
 # (Optional but recommended) Print credentials to the console for one-time setup

@@ -132,12 +132,11 @@ resource "aws_ecs_task_definition" "backend" {
     environment = [
       { name = "NODE_ENV", value = "production" },
       { name = "SERVER_PORT", value = "8080" },
-      { name = "API_PREFIX", value = "/api" },
       { name = "SERVER_URL", value = "http://${var.alb_dns_name}" },
       { name = "CLIENT_URL", value = "http://${var.alb_dns_name}" },
       { name = "COOKIE_DOMAIN", value = var.alb_dns_name },
-      { name = "MAIL_FIRSTNAME", value = "Space2Study" },
-      { name = "MAIL_LASTNAME", value = "Support" },
+      { name = "MAIL_FIRSTNAME", value = "Admin" },
+      { name = "MAIL_LASTNAME", value = "Space2Study" },
       { name = "JWT_ACCESS_EXPIRES_IN", value = "1h" },
       { name = "JWT_REFRESH_EXPIRES_IN", value = "7d" },
       { name = "JWT_RESET_EXPIRES_IN", value = "1h" },
@@ -146,12 +145,46 @@ resource "aws_ecs_task_definition" "backend" {
     ]
 
     secrets = [
-      { name = "JWT_ACCESS_SECRET", valueFrom = "${var.secret_arn}:JWT_ACCESS_SECRET::" },
-      { name = "JWT_REFRESH_SECRET", valueFrom = "${var.secret_arn}:JWT_REFRESH_SECRET::" },
-      { name = "JWT_RESET_SECRET", valueFrom = "${var.secret_arn}:JWT_RESET_SECRET::" },
-      { name = "JWT_CONFIRM_SECRET", valueFrom = "${var.secret_arn}:JWT_CONFIRM_SECRET::" },
-      { name = "MAIL_USER", valueFrom = "${var.secret_arn}:MAIL_USER::" },
-      { name = "MAIL_PASS", valueFrom = "${var.secret_arn}:MAIL_PASS::" }
+      {
+        name      = "MAIL_USER"
+        valueFrom = "${var.app_secrets_arn}:MAIL_USER::"
+      },
+      {
+        name      = "MAIL_PASS"
+        valueFrom = "${var.app_secrets_arn}:MAIL_PASS::"
+      },
+      {
+        name      = "GMAIL_CLIENT_ID"
+        valueFrom = "${var.app_secrets_arn}:GMAIL_CLIENT_ID::"
+      },
+      {
+        name      = "GMAIL_CLIENT_SECRET"
+        valueFrom = "${var.app_secrets_arn}:GMAIL_CLIENT_SECRET::"
+      },
+      {
+        name      = "GMAIL_REFRESH_TOKEN"
+        valueFrom = "${var.app_secrets_arn}:GMAIL_REFRESH_TOKEN::"
+      },
+      {
+        name      = "GMAIL_REDIRECT_URI"
+        valueFrom = "${var.app_secrets_arn}:GMAIL_REDIRECT_URI::"
+      },
+      {
+        name      = "JWT_ACCESS_SECRET"
+        valueFrom = "${var.app_secrets_arn}:JWT_ACCESS_SECRET::"
+      },
+      {
+        name      = "JWT_REFRESH_SECRET"
+        valueFrom = "${var.app_secrets_arn}:JWT_REFRESH_SECRET::"
+      },
+      {
+        name      = "JWT_RESET_SECRET"
+        valueFrom = "${var.app_secrets_arn}:JWT_RESET_SECRET::"
+      },
+      {
+        name      = "JWT_CONFIRM_SECRET"
+        valueFrom = "${var.app_secrets_arn}:JWT_CONFIRM_SECRET::"
+      }
     ]
 
     mountPoints = [{

@@ -55,12 +55,35 @@ variable "jwt_confirm_secret" {
 }
 
 variable "mail_user" {
-  type    = string
-  default = ""
+  description = "Sender email address for application notifications"
+  type        = string
 }
 
 variable "mail_pass" {
-  type      = string
-  default   = ""
-  sensitive = true
+  description = "Superuser initial admin password"
+  type        = string
+  sensitive   = true
+}
+
+variable "gmail_client_id" {
+  description = "Google OAuth 2.0 Client ID"
+  type        = string
+}
+
+variable "gmail_client_secret" {
+  description = "Google OAuth 2.0 Client Secret"
+  type        = string
+  sensitive   = true
+}
+
+variable "gmail_refresh_token" {
+  description = "Google OAuth 2.0 Refresh Token"
+  type        = string
+  sensitive   = true
+}
+
+variable "gmail_redirect_uri" {
+  description = "Google OAuth 2.0 Redirect URI"
+  type        = string
+  default     = "https://developers.google.com/oauthplayground"
 }
