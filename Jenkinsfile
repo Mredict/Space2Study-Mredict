@@ -145,11 +145,8 @@ pipeline {
                         aws ecr get-login-password --region ${params.AWS_REGION} | \
                         docker login --username AWS --password-stdin ${params.AWS_ACCOUNT_ID}.dkr.ecr.${params.AWS_REGION}.amazonaws.com
 
-                        docker push ${FRONTEND_ECR}:${IMAGE_TAG}
-                        docker push ${FRONTEND_ECR}:latest
-
-                        docker push ${BACKEND_ECR}:${IMAGE_TAG}
-                        docker push ${BACKEND_ECR}:latest
+                        docker push 456631682423.dkr.ecr.eu-central-1.amazonaws.com/space2study-frontend-dev:${IMAGE_TAG}
+                        docker push 456631682423.dkr.ecr.eu-central-1.amazonaws.com/space2study-backend-dev:${IMAGE_TAG}
                     """
                 }
             }

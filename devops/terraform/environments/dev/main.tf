@@ -63,6 +63,8 @@ module "ecs" {
   mongodb_url               = module.documentdb.mongodb_connection_string
   frontend_target_group_arn = module.alb.frontend_target_group_arn
   backend_target_group_arn  = module.alb.backend_target_group_arn
+  secret_arn                 = module.secrets.secret_arn
+  alb_dns_name               = module.alb.alb_dns_name
 }
 
 # 7. CI/CD IAM Roles
@@ -76,6 +78,20 @@ module "iam" {
   # Note: You will need to expose the service ARNs in your ecs/outputs.tf 
   frontend_ecs_service_id = module.ecs.frontend_service_arn
   backend_ecs_service_id  = module.ecs.backend_service_arn
+}
+
+module "secrets" {
+  source             = "../../modules/secrets"
+  project_name       = var.project_name
+  environment        = var.environment
+  db_username        = var.db_username
+  db_password        = var.db_password
+  jwt_access_secret  = var.jwt_access_secret
+  jwt_refresh_secret = var.jwt_refresh_secret
+  jwt_reset_secret   = var.jwt_reset_secret
+  jwt_confirm_secret = var.jwt_confirm_secret
+  mail_user          = var.mail_user
+  mail_pass          = var.mail_pass
 }
 
 # (Optional but recommended) Print credentials to the console for one-time setup

@@ -18,18 +18,18 @@ resource "aws_iam_user_policy" "jenkins_deployment_policy" {
     Version = "2012-10-17"
     Statement = [
       {
-        # AWS requires GetAuthorizationToken to apply to all resources ("*")
         Sid      = "ECRAuth"
         Effect   = "Allow"
         Action   = "ecr:GetAuthorizationToken"
         Resource = "*"
       },
       {
-        # Restrict pushing images ONLY to the Space2Study repositories
         Sid    = "ECRPushPull"
         Effect = "Allow"
         Action = [
           "ecr:BatchCheckLayerAvailability",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchGetImage",
           "ecr:InitiateLayerUpload",
           "ecr:UploadLayerPart",
           "ecr:CompleteLayerUpload",
@@ -42,7 +42,6 @@ resource "aws_iam_user_policy" "jenkins_deployment_policy" {
         ]
       },
       {
-        # Restrict ECS deployments ONLY to the Space2Study services
         Sid    = "ECSTriggerDeploy"
         Effect = "Allow"
         Action = [

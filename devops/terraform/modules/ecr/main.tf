@@ -1,7 +1,7 @@
 # 1. Frontend Image Repository
 resource "aws_ecr_repository" "frontend" {
   name                 = "${var.project_name}-frontend-${var.environment}"
-  image_tag_mutability = "IMMUTABLE"
+  image_tag_mutability = "MUTABLE" # Changed from IMMUTABLE
 
   image_scanning_configuration {
     scan_on_push = true
@@ -19,7 +19,7 @@ resource "aws_ecr_repository" "frontend" {
 # 2. Backend Image Repository
 resource "aws_ecr_repository" "backend" {
   name                 = "${var.project_name}-backend-${var.environment}"
-  image_tag_mutability = "IMMUTABLE"
+  image_tag_mutability = "MUTABLE" # Changed from IMMUTABLE
 
   image_scanning_configuration {
     scan_on_push = true

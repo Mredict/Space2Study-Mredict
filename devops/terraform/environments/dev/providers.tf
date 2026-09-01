@@ -4,7 +4,7 @@ provider "aws" {
   default_tags {
     tags = {
       Project     = "Space2Study"
-      Environment = "prod"
+      Environment = var.environment
       ManagedBy   = "Terraform"
     }
   }

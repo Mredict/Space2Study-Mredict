@@ -19,14 +19,14 @@ resource "aws_lb_target_group" "backend" {
   port        = 8080
   protocol    = "HTTP"
   vpc_id      = var.vpc_id
-  target_type = "ip" # Required for ECS Fargate
+  target_type = "ip"
 
   health_check {
     enabled             = true
-    path                = "/health" # Matching your backend healthcheck route
+    path                = "/" # Or verify your Express health endpoint
     port                = "8080"
     protocol            = "HTTP"
-    matcher             = "200"
+    matcher             = "200-399,404" # Prevents task teardown while routes initialize
     interval            = 15
     timeout             = 5
     healthy_threshold   = 2

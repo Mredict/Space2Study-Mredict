@@ -9,3 +9,13 @@ variable "backend_image" { type = string }
 variable "mongodb_url" { type = string }
 variable "frontend_target_group_arn" { type = string }
 variable "backend_target_group_arn" { type = string }
+
+variable "secret_arn" {
+  description = "ARN of the AWS Secrets Manager secret containing application credentials"
+  type        = string
+}
+
+variable "alb_dns_name" {
+  description = "Public DNS name of the ALB used for CORS and callback URLs"
+  type        = string
+}

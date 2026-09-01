@@ -20,6 +20,25 @@ resource "aws_cloudwatch_log_group" "frontend" {
 }
 
 # 3. IAM Role: Task Execution (Allows ECS agent to pull from ECR and push logs to CloudWatch)
+
+resource "aws_iam_policy" "ecs_secrets_policy" {
+  name = "${var.project_name}-ecs-secrets-policy-${var.environment}"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["secretsmanager:GetSecretValue"]
+      Resource = [var.secret_arn]
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ecs_secrets_attach" {
+  role       = aws_iam_role.ecs_execution_role.name
+  policy_arn = aws_iam_policy.ecs_secrets_policy.arn
+}
+
 resource "aws_iam_role" "ecs_execution_role" {
   name = "${var.project_name}-ecs-execution-role-${var.environment}"
 
@@ -52,23 +71,21 @@ resource "aws_iam_role" "ecs_task_role" {
   })
 }
 
-# 5. Frontend Task Definition (Single container, unprivileged user, read-only root)
+# 5. Frontend Task Definition
 resource "aws_ecs_task_definition" "frontend" {
   family                   = "${var.project_name}-frontend-${var.environment}"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = "256" # 0.25 vCPU
-  memory                   = "512" # 512 MB
+  cpu                      = "256"
+  memory                   = "512"
   execution_role_arn       = aws_iam_role.ecs_execution_role.arn
   task_role_arn            = aws_iam_role.ecs_task_role.arn
 
   container_definitions = jsonencode([{
-    name      = "frontend"
-    image     = var.frontend_image
-    essential = true
-
-    # DevSecOps Hardening: Read-only filesystem & non-root user matching Dockerfile
-    readonlyRootFilesystem = true
+    name                   = "frontend"
+    image                  = var.frontend_image
+    essential              = true
+    readonlyRootFilesystem = false
     user                   = "101"
 
     portMappings = [{
@@ -76,19 +93,6 @@ resource "aws_ecs_task_definition" "frontend" {
       hostPort      = 8080
       protocol      = "tcp"
     }]
-
-    mountPoints = [
-      {
-        sourceVolume  = "tmp"
-        containerPath = "/tmp"
-        readOnly      = false
-      },
-      {
-        sourceVolume  = "cache"
-        containerPath = "/var/cache/nginx"
-        readOnly      = false
-      }
-    ]
 
     logConfiguration = {
       logDriver = "awslogs"
@@ -99,14 +103,6 @@ resource "aws_ecs_task_definition" "frontend" {
       }
     }
   }])
-
-  volume {
-    name = "tmp"
-  }
-
-  volume {
-    name = "cache"
-  }
 }
 
 # 6. Backend Task Definition
@@ -114,8 +110,8 @@ resource "aws_ecs_task_definition" "backend" {
   family                   = "${var.project_name}-backend-${var.environment}"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = "512"  # 0.5 vCPU
-  memory                   = "1024" # 1024 MB
+  cpu                      = "512"
+  memory                   = "1024"
   execution_role_arn       = aws_iam_role.ecs_execution_role.arn
   task_role_arn            = aws_iam_role.ecs_task_role.arn
 
@@ -124,7 +120,6 @@ resource "aws_ecs_task_definition" "backend" {
     image     = var.backend_image
     essential = true
 
-    # DevSecOps Hardening: Non-root execution and read-only FS
     readonlyRootFilesystem = true
     user                   = "1000"
 
@@ -137,7 +132,26 @@ resource "aws_ecs_task_definition" "backend" {
     environment = [
       { name = "NODE_ENV", value = "production" },
       { name = "SERVER_PORT", value = "8080" },
+      { name = "API_PREFIX", value = "/api" },
+      { name = "SERVER_URL", value = "http://${var.alb_dns_name}" },
+      { name = "CLIENT_URL", value = "http://${var.alb_dns_name}" },
+      { name = "COOKIE_DOMAIN", value = var.alb_dns_name },
+      { name = "MAIL_FIRSTNAME", value = "Space2Study" },
+      { name = "MAIL_LASTNAME", value = "Support" },
+      { name = "JWT_ACCESS_EXPIRES_IN", value = "1h" },
+      { name = "JWT_REFRESH_EXPIRES_IN", value = "7d" },
+      { name = "JWT_RESET_EXPIRES_IN", value = "1h" },
+      { name = "JWT_CONFIRM_EXPIRES_IN", value = "1h" },
       { name = "MONGODB_URL", value = var.mongodb_url }
+    ]
+
+    secrets = [
+      { name = "JWT_ACCESS_SECRET", valueFrom = "${var.secret_arn}:JWT_ACCESS_SECRET::" },
+      { name = "JWT_REFRESH_SECRET", valueFrom = "${var.secret_arn}:JWT_REFRESH_SECRET::" },
+      { name = "JWT_RESET_SECRET", valueFrom = "${var.secret_arn}:JWT_RESET_SECRET::" },
+      { name = "JWT_CONFIRM_SECRET", valueFrom = "${var.secret_arn}:JWT_CONFIRM_SECRET::" },
+      { name = "MAIL_USER", valueFrom = "${var.secret_arn}:MAIL_USER::" },
+      { name = "MAIL_PASS", valueFrom = "${var.secret_arn}:MAIL_PASS::" }
     ]
 
     mountPoints = [{
