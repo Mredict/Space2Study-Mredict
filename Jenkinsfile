@@ -154,28 +154,39 @@ pipeline {
 
         stage('Deploy to AWS ECS') {
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'aws-jenkins-deployer',
-                    usernameVariable: 'AWS_ACCESS_KEY_ID',
-                    passwordVariable: 'AWS_SECRET_ACCESS_KEY'
-                )]) {
-                    sh """
-                        aws ecs update-service \
-                            --cluster ${ECS_CLUSTER} \
-                            --service ${FRONTEND_SERVICE} \
-                            --force-new-deployment \
-                            --region ${params.AWS_REGION}
+                dir("devops/terraform/environments/${params.ENV}") {
+                    withCredentials([usernamePassword(
+                        credentialsId: 'aws-jenkins-deployer',
+                        usernameVariable: 'AWS_ACCESS_KEY_ID',
+                        passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                    )]) {
+                        sh """
+                            terraform init -input=false
+                            
+                            # Застосовуємо оновлення модуля ECS з новим тегом
+                            terraform apply \
+                                -target=module.ecs \
+                                -var="image_tag=${IMAGE_TAG}" \
+                                -auto-approve \
+                                -input=false
 
-                        aws ecs update-service \
-                            --cluster ${ECS_CLUSTER} \
-                            --service ${BACKEND_SERVICE} \
-                            --force-new-deployment \
-                            --region ${params.AWS_REGION}
-                    """
+                            # Форсуємо заміну контейнерів у кластері
+                            aws ecs update-service \
+                                --cluster ${ECS_CLUSTER} \
+                                --service ${FRONTEND_SERVICE} \
+                                --force-new-deployment \
+                                --region ${params.AWS_REGION}
+
+                            aws ecs update-service \
+                                --cluster ${ECS_CLUSTER} \
+                                --service ${BACKEND_SERVICE} \
+                                --force-new-deployment \
+                                --region ${params.AWS_REGION}
+                        """
+                    }
                 }
             }
         }
-    }
 
     post {
         always {
