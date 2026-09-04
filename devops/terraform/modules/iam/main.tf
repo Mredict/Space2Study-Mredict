@@ -40,6 +40,21 @@ resource "aws_iam_policy" "jenkins_deployment_policy" {
           "ecs:RegisterTaskDefinition"
         ]
         Resource = "*"
+      },
+      {
+        Sid    = "PassRolesToECS"
+        Effect = "Allow"
+        Action = [
+          "iam:PassRole"
+        ]
+        Resource = [
+          "arn:aws:iam::*:role/${var.project_name}-ecs-*-${var.environment}"
+        ]
+        Condition = {
+          StringEquals = {
+            "iam:PassedToService" = "ecs-tasks.amazonaws.com"
+          }
+        }
       }
     ]
   })
