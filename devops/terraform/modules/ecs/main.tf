@@ -132,8 +132,8 @@ resource "aws_ecs_task_definition" "backend" {
     environment = [
       { name = "NODE_ENV", value = "production" },
       { name = "SERVER_PORT", value = "8080" },
-      { name = "SERVER_URL", value = "http://${var.alb_dns_name}" },
-      { name = "CLIENT_URL", value = "http://${var.alb_dns_name}" },
+      { name = "SERVER_URL", value = "https://${var.alb_dns_name}" },
+      { name = "CLIENT_URL", value = "https://${var.alb_dns_name}" },
       { name = "COOKIE_DOMAIN", value = var.alb_dns_name },
       { name = "MAIL_FIRSTNAME", value = "Admin" },
       { name = "MAIL_LASTNAME", value = "Space2Study" },
@@ -216,6 +216,11 @@ resource "aws_ecs_service" "frontend" {
   desired_count   = 1
   launch_type     = "FARGATE"
 
+  deployment_circuit_breaker {
+    enable   = true
+    rollback = true
+  }
+
   network_configuration {
     subnets          = var.private_subnets
     security_groups  = [var.frontend_sg_id]
@@ -225,7 +230,7 @@ resource "aws_ecs_service" "frontend" {
   load_balancer {
     target_group_arn = var.frontend_target_group_arn
     container_name   = "frontend"
-    container_port   = 8080 # Changed from containerPort to container_port
+    container_port   = 8080
   }
 }
 
@@ -237,6 +242,11 @@ resource "aws_ecs_service" "backend" {
   desired_count   = 3
   launch_type     = "FARGATE"
 
+  deployment_circuit_breaker {
+    enable   = true
+    rollback = true
+  }
+
   network_configuration {
     subnets          = var.private_subnets
     security_groups  = [var.backend_sg_id]
@@ -246,6 +256,6 @@ resource "aws_ecs_service" "backend" {
   load_balancer {
     target_group_arn = var.backend_target_group_arn
     container_name   = "backend"
-    container_port   = 8080 # Changed from containerPort to container_port
+    container_port   = 8080
   }
 }

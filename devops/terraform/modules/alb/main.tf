@@ -1,3 +1,13 @@
+# 0. ACM Certificate for ALB (Self-Signed)
+resource "aws_acm_certificate" "alb_cert" {
+  private_key       = file("${path.module}/../../certs/alb_selfsigned.key")
+  certificate_body  = file("${path.module}/../../certs/alb_selfsigned.crt")
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
 # 1. Public Application Load Balancer
 resource "aws_lb" "main" {
   name               = "${var.project_name}-alb-${var.environment}"
@@ -58,10 +68,28 @@ resource "aws_lb_target_group" "frontend" {
 # 4. HTTP Listener (Port 80)
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.main.arn
-  port              = "80"
+  port              = 80
   protocol          = "HTTP"
 
-  # Default: route standard traffic to the Frontend target group
+  default_action {
+    type = "redirect"
+
+    redirect {
+      port        = "443"
+      protocol    = "HTTPS"
+      status_code = "HTTP_301"
+    }
+  }
+}
+
+# 4. HTTPS Listener (Port 443)
+resource "aws_lb_listener" "https" {
+  load_balancer_arn = aws_lb.main.arn
+  port              = 443
+  protocol          = "HTTPS"
+  ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
+  certificate_arn   = aws_acm_certificate.alb_cert.arn
+
   default_action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.frontend.arn
@@ -69,9 +97,9 @@ resource "aws_lb_listener" "http" {
 }
 
 # 5. Listener Rule: Route /api/* to the Backend API Target Group
-resource "aws_lb_listener_rule" "api_routing" {
-  listener_arn = aws_lb_listener.http.arn
-  priority     = 100
+resource "aws_lb_listener_rule" "backend_api" {
+  listener_arn = aws_lb_listener.https.arn
+  priority     = 10
 
   action {
     type             = "forward"
@@ -80,7 +108,7 @@ resource "aws_lb_listener_rule" "api_routing" {
 
   condition {
     path_pattern {
-      values = ["/api/*", "/api"]
+      values = ["/api/*"]
     }
   }
 }
