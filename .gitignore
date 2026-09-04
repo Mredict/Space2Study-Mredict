@@ -15,6 +15,10 @@ terraform.tfvars
 plan.txt
 plan.json
 
+devops/certs/*.key
+devops/certs/*.srl
+devops/certs/*.csr
+
 override.tf
 override.tf.json
 *_override.tf

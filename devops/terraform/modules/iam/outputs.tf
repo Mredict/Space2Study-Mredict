@@ -1,10 +1,14 @@
-output "jenkins_access_key_id" {
-  description = "Access Key ID for Jenkins (Configure in Jenkins Credentials)"
-  value       = aws_iam_access_key.jenkins_keys.id
+output "trust_anchor_arn" {
+  description = "ARN of the IAM Roles Anywhere Trust Anchor"
+  value       = aws_rolesanywhere_trust_anchor.jenkins.arn
 }
 
-output "jenkins_secret_access_key" {
-  description = "Secret Access Key for Jenkins (Configure in Jenkins Credentials)"
-  value       = aws_iam_access_key.jenkins_keys.secret
-  sensitive   = true
+output "profile_arn" {
+  description = "ARN of the IAM Roles Anywhere Profile"
+  value       = aws_rolesanywhere_profile.jenkins_profile.arn
+}
+
+output "role_arn" {
+  description = "ARN of the IAM Role assumed via Roles Anywhere"
+  value       = aws_iam_role.jenkins_roles_anywhere.arn
 }

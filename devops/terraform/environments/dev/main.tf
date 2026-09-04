@@ -72,15 +72,14 @@ module "ecs" {
 
 # 7. CI/CD IAM Roles
 module "iam" {
-  source           = "../../modules/iam"
-  project_name     = var.project_name
-  environment      = var.environment
-  frontend_ecr_arn = module.ecr.frontend_repository_arn
-  backend_ecr_arn  = module.ecr.backend_repository_arn
-
-  # Note: You will need to expose the service ARNs in your ecs/outputs.tf 
+  source                  = "../../modules/iam"
+  project_name            = var.project_name
+  environment             = var.environment
+  frontend_ecr_arn        = module.ecr.frontend_repository_arn
+  backend_ecr_arn         = module.ecr.backend_repository_arn
   frontend_ecs_service_id = module.ecs.frontend_service_arn
   backend_ecs_service_id  = module.ecs.backend_service_arn
+  root_ca_certificate     = file("${path.root}/../../certs/rootCA.crt")
 }
 
 module "secrets" {
@@ -102,11 +101,23 @@ module "secrets" {
 }
 
 # (Optional but recommended) Print credentials to the console for one-time setup
-output "jenkins_aws_access_key_id" {
-  value = module.iam.jenkins_access_key_id
+#output "jenkins_aws_access_key_id" {
+#  value = module.iam.jenkins_access_key_id
+#}
+
+#output "jenkins_aws_secret_access_key" {
+#  value     = module.iam.jenkins_secret_access_key
+#  sensitive = true
+#}
+
+output "jenkins_roles_anywhere_trust_anchor_arn" {
+  value = module.iam.trust_anchor_arn
 }
 
-output "jenkins_aws_secret_access_key" {
-  value     = module.iam.jenkins_secret_access_key
-  sensitive = true
+output "jenkins_roles_anywhere_profile_arn" {
+  value = module.iam.profile_arn
+}
+
+output "jenkins_roles_anywhere_role_arn" {
+  value = module.iam.role_arn
 }

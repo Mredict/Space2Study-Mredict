@@ -1,18 +1,7 @@
-# 1. IAM User for Local Jenkins Agent
-resource "aws_iam_user" "jenkins_deployer" {
-  name = "${var.project_name}-jenkins-deployer-${var.environment}"
-  path = "/system/"
-}
-
-# 2. Generate Access Keys (To be securely stored in local Jenkins Credentials)
-resource "aws_iam_access_key" "jenkins_keys" {
-  user = aws_iam_user.jenkins_deployer.name
-}
-
-# 3. Least-Privilege Policy for ECR and ECS
-resource "aws_iam_user_policy" "jenkins_deployment_policy" {
-  name = "${var.project_name}-deployment-policy-${var.environment}"
-  user = aws_iam_user.jenkins_deployer.name
+# 1. Managed Deployment Policy (ECR + ECS permissions)
+resource "aws_iam_policy" "jenkins_deployment_policy" {
+  name        = "${var.project_name}-deployment-policy-${var.environment}"
+  description = "Allows Jenkins to push ECR images and trigger ECS deployments"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -46,13 +35,66 @@ resource "aws_iam_user_policy" "jenkins_deployment_policy" {
         Effect = "Allow"
         Action = [
           "ecs:UpdateService",
-          "ecs:DescribeServices"
+          "ecs:DescribeServices",
+          "ecs:DescribeTaskDefinition",
+          "ecs:RegisterTaskDefinition"
         ]
-        Resource = [
-          var.frontend_ecs_service_id,
-          var.backend_ecs_service_id
-        ]
+        Resource = "*"
       }
     ]
   })
+}
+
+# 2. Trust Anchor (registers your Root CA with AWS)
+resource "aws_rolesanywhere_trust_anchor" "jenkins" {
+  name    = "${var.project_name}-jenkins-trust-anchor-${var.environment}"
+  enabled = true
+
+  source {
+    source_data {
+      x509_certificate_data = var.root_ca_certificate
+    }
+    source_type = "CERTIFICATE_BUNDLE"
+  }
+}
+
+# 3. IAM Role Assumed by the Jenkins Agent
+resource "aws_iam_role" "jenkins_roles_anywhere" {
+  name = "${var.project_name}-jenkins-roles-anywhere-${var.environment}"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "rolesanywhere.amazonaws.com"
+        }
+        Action = [
+          "sts:AssumeRole",
+          "sts:SetSourceIdentity",
+          "sts:TagSession"
+        ]
+        Condition = {
+          ArnEquals = {
+            "aws:SourceArn" = aws_rolesanywhere_trust_anchor.jenkins.arn
+          }
+        }
+      }
+    ]
+  })
+}
+
+# 4. Attach Deployment Policy to the Roles Anywhere Role
+resource "aws_iam_role_policy_attachment" "jenkins_deploy_attach" {
+  role       = aws_iam_role.jenkins_roles_anywhere.name
+  policy_arn = aws_iam_policy.jenkins_deployment_policy.arn
+}
+
+# 5. IAM Roles Anywhere Profile (links Trust Anchor and Role)
+resource "aws_rolesanywhere_profile" "jenkins_profile" {
+  name             = "${var.project_name}-jenkins-profile-${var.environment}"
+  enabled          = true
+  duration_seconds = 3600
+  role_arns        = [aws_iam_role.jenkins_roles_anywhere.arn]
 }
