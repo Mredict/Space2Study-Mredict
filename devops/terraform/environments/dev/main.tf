@@ -47,6 +47,8 @@ module "documentdb" {
   db_password        = var.db_password
   ecs_cluster_id     = module.ecs.cluster_name
   execution_role_arn = module.ecs.execution_role_arn
+  secret_arn         = module.secrets.secret_arn
+  app_secrets_arn    = module.secrets.secret_arn
 }
 
 # 6. Container Orchestration (ECS Fargate)
@@ -84,6 +86,8 @@ module "iam" {
 module "secrets" {
   source              = "../../modules/secrets"
   project_name        = var.project_name
+  db_username         = var.db_username
+  db_password         = var.db_password
   environment         = var.environment
   jwt_access_secret   = var.jwt_access_secret
   jwt_refresh_secret  = var.jwt_refresh_secret

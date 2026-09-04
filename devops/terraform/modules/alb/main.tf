@@ -6,7 +6,7 @@ resource "aws_lb" "main" {
   security_groups    = [var.alb_sg_id]
   subnets            = var.public_subnets
 
-  drop_invalid_header_fields = true # DevSecOps: Mitigate HTTP desync/smuggling attacks
+  drop_invalid_header_fields = true # DevSecOps
 
   tags = {
     Name = "${var.project_name}-alb-${var.environment}"
@@ -23,10 +23,10 @@ resource "aws_lb_target_group" "backend" {
 
   health_check {
     enabled             = true
-    path                = "/" # Or verify your Express health endpoint
+    path                = "/"
     port                = "8080"
     protocol            = "HTTP"
-    matcher             = "200-399,404" # Prevents task teardown while routes initialize
+    matcher             = "200-399,404"
     interval            = 15
     timeout             = 5
     healthy_threshold   = 2
@@ -40,7 +40,7 @@ resource "aws_lb_target_group" "frontend" {
   port        = 8080
   protocol    = "HTTP"
   vpc_id      = var.vpc_id
-  target_type = "ip" # Required for ECS Fargate
+  target_type = "ip"
 
   health_check {
     enabled             = true
@@ -61,7 +61,7 @@ resource "aws_lb_listener" "http" {
   port              = "80"
   protocol          = "HTTP"
 
-  # Default action: route standard traffic to the Frontend target group
+  # Default: route standard traffic to the Frontend target group
   default_action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.frontend.arn

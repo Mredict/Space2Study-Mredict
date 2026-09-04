@@ -52,3 +52,12 @@ variable "gmail_refresh_token" {
 variable "gmail_redirect_uri" {
   type = string
 }
+
+variable "db_username" {
+  type = string
+}
+
+variable "db_password" {
+  type      = string
+  sensitive = true
+}

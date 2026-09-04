@@ -21,7 +21,7 @@ resource "aws_service_discovery_service" "mongodb" {
     }
   }
 
-  health_check_custom_config {}
+#  health_check_custom_config {}
 }
 
 # 3. EFS Security Group
@@ -108,9 +108,15 @@ resource "aws_ecs_task_definition" "mongodb" {
       protocol      = "tcp"
     }]
 
-    environment = [
-      { name = "MONGO_INITDB_ROOT_USERNAME", value = var.db_username },
-      { name = "MONGO_INITDB_ROOT_PASSWORD", value = var.db_password }
+    secrets = [
+      {
+        name      = "MONGO_INITDB_ROOT_USERNAME"
+        valueFrom = "${var.app_secrets_arn}:DB_USERNAME::"
+      },
+      {
+        name      = "MONGO_INITDB_ROOT_PASSWORD"
+        valueFrom = "${var.app_secrets_arn}:DB_PASSWORD::"
+      }
     ]
 
     mountPoints = [{

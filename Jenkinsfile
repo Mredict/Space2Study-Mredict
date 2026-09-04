@@ -142,11 +142,14 @@ pipeline {
                     passwordVariable: 'AWS_SECRET_ACCESS_KEY'
                 )]) {
                     sh """
+                        set -e
                         aws ecr get-login-password --region ${params.AWS_REGION} | \
-                        docker login --username AWS --password-stdin ${params.AWS_ACCOUNT_ID}.dkr.ecr.${params.AWS_REGION}.amazonaws.com
+                            docker login --username AWS --password-stdin ${params.AWS_ACCOUNT_ID}.dkr.ecr.${params.AWS_REGION}.amazonaws.com
 
-                        docker push 456631682423.dkr.ecr.eu-central-1.amazonaws.com/space2study-frontend-dev:${IMAGE_TAG}
-                        docker push 456631682423.dkr.ecr.eu-central-1.amazonaws.com/space2study-backend-dev:${IMAGE_TAG}
+                        docker push ${FRONTEND_ECR}:${IMAGE_TAG}
+                        docker push ${FRONTEND_ECR}:latest
+                        docker push ${BACKEND_ECR}:${IMAGE_TAG}
+                        docker push ${BACKEND_ECR}:latest
                     """
                 }
             }
@@ -154,36 +157,32 @@ pipeline {
 
         stage('Deploy to AWS ECS') {
             steps {
-                dir("devops/terraform/environments/${params.ENV}") {
-                    withCredentials([usernamePassword(
-                        credentialsId: 'aws-jenkins-deployer',
-                        usernameVariable: 'AWS_ACCESS_KEY_ID',
-                        passwordVariable: 'AWS_SECRET_ACCESS_KEY'
-                    )]) {
-                        sh """
-                            terraform init -input=false
-                            
-                            # Застосовуємо оновлення модуля ECS з новим тегом
-                            terraform apply \
-                                -target=module.ecs \
-                                -var="image_tag=${IMAGE_TAG}" \
-                                -auto-approve \
-                                -input=false
+                withCredentials([usernamePassword(
+                    credentialsId: 'aws-jenkins-deployer',
+                    usernameVariable: 'AWS_ACCESS_KEY_ID',
+                    passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                )]) {
+                    sh """
+                        set -e
+                        # 1. Update Backend Task Definition Image
 
-                            # Форсуємо заміну контейнерів у кластері
-                            aws ecs update-service \
-                                --cluster ${ECS_CLUSTER} \
-                                --service ${FRONTEND_SERVICE} \
-                                --force-new-deployment \
-                                --region ${params.AWS_REGION}
+                        BACKEND_DEF=\$(aws ecs describe-task-definition --task-definition "${BACKEND_SERVICE}" --region "${params.AWS_REGION}")
+                        NEW_BACKEND=\$(echo \$BACKEND_DEF | jq --arg IMG "${BACKEND_ECR}:${IMAGE_TAG}" \
+                            '.taskDefinition | .containerDefinitions[0].image = \$IMG | del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)')
+                        NEW_BACKEND_ARN=\$(aws ecs register-task-definition --cli-input-json "\$NEW_BACKEND" --region "${params.AWS_REGION}" --query 'taskDefinition.taskDefinitionArn' --output text)
 
-                            aws ecs update-service \
-                                --cluster ${ECS_CLUSTER} \
-                                --service ${BACKEND_SERVICE} \
-                                --force-new-deployment \
-                                --region ${params.AWS_REGION}
-                        """
-                    }
+                        # 2. Update Frontend Task Definition Image
+
+                        FRONTEND_DEF=\$(aws ecs describe-task-definition --task-definition "${FRONTEND_SERVICE}" --region "${params.AWS_REGION}")
+                        NEW_FRONTEND=\$(echo \$FRONTEND_DEF | jq --arg IMG "${FRONTEND_ECR}:${IMAGE_TAG}" \
+                            '.taskDefinition | .containerDefinitions[0].image = \$IMG | del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)')
+                        NEW_FRONTEND_ARN=\$(aws ecs register-task-definition --cli-input-json "\$NEW_FRONTEND" --region "${params.AWS_REGION}" --query 'taskDefinition.taskDefinitionArn' --output text)
+
+                        # 3. Deploy Services
+
+                        aws ecs update-service --cluster "${ECS_CLUSTER}" --service "${BACKEND_SERVICE}" --task-definition "\$NEW_BACKEND_ARN" --region "${params.AWS_REGION}"
+                        aws ecs update-service --cluster "${ECS_CLUSTER}" --service "${FRONTEND_SERVICE}" --task-definition "\$NEW_FRONTEND_ARN" --region "${params.AWS_REGION}"
+                    """
                 }
             }
         }
@@ -203,4 +202,4 @@ pipeline {
             echo "❌ Deployment to ${params.ENV} failed. Check the Jenkins console logs for details."
         }
     }
-}
+} 
