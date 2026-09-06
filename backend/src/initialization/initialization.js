@@ -28,6 +28,7 @@ const initialization = (app) => {
   const swaggerSettings = swaggerJsDoc(swaggerOptions)
   app.use('/api-docs', swaggerUI.serve, swaggerUI.setup(swaggerSettings))
 
+  app.use('/api', router);
   app.use('/', router)
 
   app.use((_req, _res, next) => {
