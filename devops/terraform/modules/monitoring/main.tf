@@ -85,6 +85,7 @@ resource "aws_cloudwatch_metric_alarm" "alb_high_5xx" {
   period              = 60
   statistic           = "Sum"
   threshold           = 5
+  treat_missing_data  = "notBreaching"
   alarm_description   = "Target returned >= 5 HTTP 5XX responses over 2 consecutive minutes."
   alarm_actions       = [aws_sns_topic.alerts.arn]
   ok_actions          = [aws_sns_topic.alerts.arn]

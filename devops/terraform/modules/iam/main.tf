@@ -60,7 +60,7 @@ resource "aws_iam_policy" "jenkins_deployment_policy" {
   })
 }
 
-# 2. Trust Anchor (registers your Root CA with AWS)
+# 2. Trust Anchor (registers Root CA with AWS)
 resource "aws_rolesanywhere_trust_anchor" "jenkins" {
   name    = "${var.project_name}-jenkins-trust-anchor-${var.environment}"
   enabled = true
@@ -112,4 +112,29 @@ resource "aws_rolesanywhere_profile" "jenkins_profile" {
   enabled          = true
   duration_seconds = 3600
   role_arns        = [aws_iam_role.jenkins_roles_anywhere.arn]
+}
+
+# 6. SSM Parameter Store References for Dynamic Retrieval
+resource "aws_ssm_parameter" "roles_anywhere_trust_anchor_arn" {
+  name        = "/${var.project_name}/${var.environment}/iam/trust_anchor_arn"
+  description = "Roles Anywhere Trust Anchor ARN"
+  type        = "String"
+  value       = aws_rolesanywhere_trust_anchor.jenkins.arn
+  overwrite   = true
+}
+
+resource "aws_ssm_parameter" "roles_anywhere_profile_arn" {
+  name        = "/${var.project_name}/${var.environment}/iam/profile_arn"
+  description = "Roles Anywhere Profile ARN"
+  type        = "String"
+  value       = aws_rolesanywhere_profile.jenkins_profile.arn
+  overwrite   = true
+}
+
+resource "aws_ssm_parameter" "roles_anywhere_role_arn" {
+  name        = "/${var.project_name}/${var.environment}/iam/role_arn"
+  description = "Roles Anywhere IAM Role ARN"
+  type        = "String"
+  value       = aws_iam_role.jenkins_roles_anywhere.arn
+  overwrite   = true
 }

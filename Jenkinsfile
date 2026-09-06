@@ -18,6 +18,7 @@ pipeline {
         ECS_CLUSTER      = "space2study-cluster-${params.ENV}"
         FRONTEND_SERVICE = "space2study-frontend-${params.ENV}"
         BACKEND_SERVICE  = "space2study-backend-${params.ENV}"
+        
     }
 
     stages {
