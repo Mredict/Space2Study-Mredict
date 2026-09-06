@@ -1,0 +1,24 @@
+# Deployment metadata
+environment  = "dev"
+project_name = "space2study"
+aws_region   = "eu-central-1"
+
+# Database credentials
+db_username = "dbadmin"
+db_password = "replace-with-a-secure-database-password"
+
+# JWT Signing Secrets (use strong random strings)
+jwt_access_secret  = "replace-with-a-random-jwt-access-secret"
+jwt_refresh_secret = "replace-with-a-random-jwt-refresh-secret"
+jwt_reset_secret   = "replace-with-a-random-jwt-reset-secret"
+jwt_confirm_secret = "replace-with-a-random-jwt-confirm-secret"
+
+# Superuser / Mail credentials
+mail_user           = "admin@example.com"
+mail_pass           = "replace-with-the-initial-admin-password"
+gmail_client_id     = "replace-with-your-google-oauth-client-id"
+gmail_client_secret = "replace-with-your-google-oauth-client-secret"
+gmail_refresh_token = "replace-with-your-google-oauth-refresh-token"
+gmail_redirect_uri  = "https://developers.google.com/oauthplayground"
+
+discord_webhook_url = "refresh-with-your-discord-webhook-url"

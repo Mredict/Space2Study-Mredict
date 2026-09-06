@@ -100,6 +100,25 @@ module "secrets" {
   gmail_redirect_uri  = var.gmail_redirect_uri
 }
 
+module "monitoring" {
+  source = "../../modules/monitoring"
+
+  project_name        = var.project_name
+  environment         = var.environment
+  discord_webhook_url = var.discord_webhook_url
+
+  ecs_cluster_name       = module.ecs.cluster_name
+  frontend_service_name  = module.ecs.frontend_service_name
+  backend_service_name   = module.ecs.backend_service_name
+  alb_arn_suffix         = module.alb.alb_arn_suffix
+  frontend_tg_arn_suffix = module.alb.frontend_tg_arn_suffix
+  backend_tg_arn_suffix  = module.alb.backend_tg_arn_suffix
+}
+
+output "monitoring_sns_topic_arn" {
+  value = module.monitoring.sns_topic_arn
+}
+
 # (Optional but recommended) Print credentials to the console for one-time setup
 #output "jenkins_aws_access_key_id" {
 #  value = module.iam.jenkins_access_key_id

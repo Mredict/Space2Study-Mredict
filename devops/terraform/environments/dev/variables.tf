@@ -87,3 +87,9 @@ variable "gmail_redirect_uri" {
   type        = string
   default     = "https://developers.google.com/oauthplayground"
 }
+
+variable "discord_webhook_url" {
+  type        = string
+  description = "Discord incoming webhook URL"
+  sensitive   = true
+}
