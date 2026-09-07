@@ -79,7 +79,6 @@ module "iam" {
   backend_ecr_arn         = module.ecr.backend_repository_arn
   frontend_ecs_service_id = module.ecs.frontend_service_arn
   backend_ecs_service_id  = module.ecs.backend_service_arn
-  root_ca_certificate     = file("${path.root}/../../certs/rootCA.crt")
 }
 
 module "secrets" {
@@ -119,24 +118,11 @@ output "monitoring_sns_topic_arn" {
   value = module.monitoring.sns_topic_arn
 }
 
-# (Optional but recommended) Print credentials to the console for one-time setup
-#output "jenkins_aws_access_key_id" {
-#  value = module.iam.jenkins_access_key_id
-#}
-
-#output "jenkins_aws_secret_access_key" {
-#  value     = module.iam.jenkins_secret_access_key
-#  sensitive = true
-#}
-
-output "jenkins_roles_anywhere_trust_anchor_arn" {
-  value = module.iam.trust_anchor_arn
+output "jenkins_aws_access_key_id" {
+  value = module.iam.jenkins_access_key_id
 }
 
-output "jenkins_roles_anywhere_profile_arn" {
-  value = module.iam.profile_arn
-}
-
-output "jenkins_roles_anywhere_role_arn" {
-  value = module.iam.role_arn
+output "jenkins_aws_secret_access_key" {
+  value     = module.iam.jenkins_secret_access_key
+  sensitive = true
 }

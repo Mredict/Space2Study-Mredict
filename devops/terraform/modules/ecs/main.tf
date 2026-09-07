@@ -11,12 +11,12 @@ resource "aws_ecs_cluster" "main" {
 # 2. CloudWatch Log Groups for Container Logging
 resource "aws_cloudwatch_log_group" "backend" {
   name              = "/ecs/${var.project_name}-backend-${var.environment}"
-  retention_in_days = 30
+  retention_in_days = 7
 }
 
 resource "aws_cloudwatch_log_group" "frontend" {
   name              = "/ecs/${var.project_name}-frontend-${var.environment}"
-  retention_in_days = 30
+  retention_in_days = 7
 }
 
 # 3. IAM Role: Task Execution (Allows ECS agent to pull from ECR and push logs to CloudWatch)

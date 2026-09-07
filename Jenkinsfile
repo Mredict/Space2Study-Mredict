@@ -137,47 +137,62 @@ pipeline {
 
         stage('Push to Amazon ECR') {
             environment {
-                AWS_PROFILE = 'roles-anywhere'
-                AWS_REGION  = "${params.AWS_REGION}"
+                AWS_REGION = "${params.AWS_REGION}"
             }
             steps {
-                sh '''
-                    set -e
-                    aws ecr get-login-password --region "${AWS_REGION}" | \
-                        docker login --username AWS --password-stdin "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-jenkins-credentials',
+                    accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                    secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+                ]]) {
+                    sh '''
+                        set -e
+                        aws ecr get-login-password --region "${AWS_REGION}" | \
+                            docker login --username AWS --password-stdin "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
 
-                    docker push "${FRONTEND_ECR}:${IMAGE_TAG}"
-                    docker push "${FRONTEND_ECR}:latest"
-                    docker push "${BACKEND_ECR}:${IMAGE_TAG}"
-                    docker push "${BACKEND_ECR}:latest"
-                '''
+                        docker push "${FRONTEND_ECR}:${IMAGE_TAG}"
+                        docker push "${FRONTEND_ECR}:latest"
+                        docker push "${BACKEND_ECR}:${IMAGE_TAG}"
+                        docker push "${BACKEND_ECR}:latest"
+                    '''
+                }
             }
         }
 
-        stage('Deploy to AWS ECS') {
+       stage('Deploy to AWS ECS') {
             environment {
-                AWS_PROFILE = 'roles-anywhere'
-                AWS_REGION  = "${params.AWS_REGION}"
+                AWS_REGION = "${params.AWS_REGION}"
             }
             steps {
-                sh '''
-                    set -e
-                    # 1. Update Backend task definition image revision
-                    BACKEND_DEF=$(aws ecs describe-task-definition --task-definition "${BACKEND_SERVICE}" --region "${AWS_REGION}")
-                    NEW_BACKEND=$(echo "$BACKEND_DEF" | jq --arg IMG "${BACKEND_ECR}:${IMAGE_TAG}" \
-                        '.taskDefinition | .containerDefinitions[0].image = $IMG | del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)')
-                    NEW_BACKEND_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_BACKEND" --region "${AWS_REGION}" --query 'taskDefinition.taskDefinitionArn' --output text)
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-jenkins-credentials',
+                    accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                    secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+                ]]) {
+                    sh '''
+                        set -e
+                        # 1. Update Backend task definition image revision
+                        BACKEND_DEF=$(aws ecs describe-task-definition --task-definition "${BACKEND_SERVICE}" --region "${AWS_REGION}")
+                        NEW_BACKEND=$(echo "$BACKEND_DEF" | jq --arg IMG "${BACKEND_ECR}:${IMAGE_TAG}" \
+                            '(.taskDefinition.containerDefinitions[] | select(.name == "backend")).image = $IMG | del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy, .deregisteredAt)')
+                        NEW_BACKEND_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_BACKEND" --region "${AWS_REGION}" --query 'taskDefinition.taskDefinitionArn' --output text)
 
-                    # 2. Update Frontend task definition image revision
-                    FRONTEND_DEF=$(aws ecs describe-task-definition --task-definition "${FRONTEND_SERVICE}" --region "${AWS_REGION}")
-                    NEW_FRONTEND=$(echo "$FRONTEND_DEF" | jq --arg IMG "${FRONTEND_ECR}:${IMAGE_TAG}" \
-                        '.taskDefinition | .containerDefinitions[0].image = $IMG | del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)')
-                    NEW_FRONTEND_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_FRONTEND" --region "${AWS_REGION}" --query 'taskDefinition.taskDefinitionArn' --output text)
+                        # 2. Update Frontend task definition image revision
+                        FRONTEND_DEF=$(aws ecs describe-task-definition --task-definition "${FRONTEND_SERVICE}" --region "${AWS_REGION}")
+                        NEW_FRONTEND=$(echo "$FRONTEND_DEF" | jq --arg IMG "${FRONTEND_ECR}:${IMAGE_TAG}" \
+                            '(.taskDefinition.containerDefinitions[] | select(.name == "frontend")).image = $IMG | del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy, .deregisteredAt)')
+                        NEW_FRONTEND_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_FRONTEND" --region "${AWS_REGION}" --query 'taskDefinition.taskDefinitionArn' --output text)
 
-                    # 3. Trigger rolling deployment in ECS
-                    aws ecs update-service --cluster "${ECS_CLUSTER}" --service "${BACKEND_SERVICE}" --task-definition "$NEW_BACKEND_ARN" --region "${AWS_REGION}"
-                    aws ecs update-service --cluster "${ECS_CLUSTER}" --service "${FRONTEND_SERVICE}" --task-definition "$NEW_FRONTEND_ARN" --region "${AWS_REGION}"
-                '''
+                        # 3. Trigger rolling deployment in ECS
+                        aws ecs update-service --cluster "${ECS_CLUSTER}" --service "${BACKEND_SERVICE}" --task-definition "$NEW_BACKEND_ARN" --region "${AWS_REGION}"
+                        aws ecs update-service --cluster "${ECS_CLUSTER}" --service "${FRONTEND_SERVICE}" --task-definition "$NEW_FRONTEND_ARN" --region "${AWS_REGION}"
+                        
+                        # 4. Wait for services to stabilize
+                        aws ecs wait services-stable --cluster "${ECS_CLUSTER}" --services "${BACKEND_SERVICE}" "${FRONTEND_SERVICE}" --region "${AWS_REGION}"
+                    '''
+                }
             }
         }
     }
