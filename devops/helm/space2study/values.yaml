@@ -33,7 +33,7 @@ backend:
   replicaCount: 1
   image:
     repository: 456631682423.dkr.ecr.eu-central-1.amazonaws.com/space2study-backend-dev
-    tag: "latest" # backend-tag
+    tag: "201-119e5e3" # backend-tag
     pullPolicy: Always
   service:
     port: 8080
@@ -50,7 +50,7 @@ frontend:
   replicaCount: 1
   image:
     repository: 456631682423.dkr.ecr.eu-central-1.amazonaws.com/space2study-frontend-dev
-    tag: "latest" # frontend-tag
+    tag: "201-119e5e3" # frontend-tag
     pullPolicy: Always
   service:
     port: 8080
