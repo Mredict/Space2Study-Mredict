@@ -18,7 +18,7 @@ pipeline {
         
         HELM_RELEASE = "space2study-${params.ENV}"
         K8S_NAMESPACE = "space2study-${params.ENV}"
-        CHART_DIR    = "devops/helm/space2study"
+        CHART_DIR    = "devops/helm"
     }
 
     stages {
