@@ -15,7 +15,7 @@ pipeline {
         FRONTEND_ECR = "${params.AWS_ACCOUNT_ID}.dkr.ecr.${params.AWS_REGION}.amazonaws.com/space2study-frontend-${params.ENV}"
         BACKEND_ECR  = "${params.AWS_ACCOUNT_ID}.dkr.ecr.${params.AWS_REGION}.amazonaws.com/space2study-backend-${params.ENV}"
         
-        HELM_VALUES_FILE = "devops/helm/values.yaml"
+        HELM_VALUES_FILE = "devops/helm/space2study/values.yaml"
     }
 
     stages {
@@ -43,8 +43,8 @@ pipeline {
                 stage('Helm & Terraform Security Scan') {
                     steps {
                         sh '''
-                            helm lint devops/helm/ || true
-                            trivy config devops/helm/ --severity HIGH,CRITICAL || true
+                            helm lint devops/helm/space2study || true
+                            trivy config devops/helm/space2study --severity HIGH,CRITICAL || true
                             trivy config devops/terraform/ --severity HIGH,CRITICAL || true
                         '''
                     }
