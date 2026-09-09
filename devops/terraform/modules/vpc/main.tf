@@ -15,17 +15,14 @@ module "vpc" {
 
   enable_dns_hostnames = true
   enable_dns_support   = true
-}
 
-# Free S3 Gateway VPC Endpoint
-resource "aws_vpc_endpoint" "s3" {
-  vpc_id            = module.vpc.vpc_id
-  service_name      = "com.amazonaws.eu-central-1.s3"
-  vpc_endpoint_type = "Gateway"
+  public_subnet_tags = {
+    "kubernetes.io/role/elb"                    = "1"
+    "kubernetes.io/cluster/${var.project_name}" = "shared"
+  }
 
-  route_table_ids = module.vpc.private_route_table_ids
-
-  tags = {
-    Name = "${var.project_name}-s3-endpoint-${var.environment}"
+  private_subnet_tags = {
+    "kubernetes.io/role/internal-elb"           = "1"
+    "kubernetes.io/cluster/${var.project_name}" = "shared"
   }
 }

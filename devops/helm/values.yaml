@@ -1,0 +1,78 @@
+global:
+  environment: dev
+  domain: ""
+
+# Ingress Controller Configuration
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+
+# MongoDB Database Engine
+mongodb:
+  enabled: true
+  image:
+    repository: mongo
+    tag: "8.3.8-noble"
+    pullPolicy: IfNotPresent
+  storage:
+    size: 5Gi
+    storageClassName: local-path
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+# Backend API
+backend:
+  replicaCount: 1
+  image:
+    repository: 456631682423.dkr.ecr.eu-central-1.amazonaws.com/space2study-backend-dev
+    tag: latest
+    pullPolicy: Always
+  service:
+    port: 8080
+  resources:
+    requests:
+      cpu: 50m
+      memory: 192Mi
+    limits:
+      cpu: 300m
+      memory: 384Mi
+
+# Frontend UI
+frontend:
+  replicaCount: 1
+  image:
+    repository: 456631682423.dkr.ecr.eu-central-1.amazonaws.com/space2study-frontend-dev
+    tag: latest
+    pullPolicy: Always
+  service:
+    port: 8080
+  resources:
+    requests:
+      cpu: 20m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+# Environment Secrets
+secrets:
+  dbUsername: "dbadmin"
+  dbPassword: "ChangeMeInDevSecOps123!"
+  jwtAccessSecret: "access_secret_sample"
+  jwtRefreshSecret: "refresh_secret_sample"
+  jwtResetSecret: "reset_secret_sample"
+  jwtConfirmSecret: "confirm_secret_sample"
+  mailUser: "admin@space2study.com"
+  mailPass: "mail_password"
+  gmailClientId: "sample_client_id"
+  gmailClientSecret: "sample_client_secret"
+  gmailRefreshToken: "sample_refresh_token"
+  gmailRedirectUri: "https://developers.google.com/oauthplayground"

@@ -1,4 +1,4 @@
-# 1. Network Layer
+# 1. VPC Network Layer
 module "networking" {
   source             = "../../modules/vpc"
   project_name       = var.project_name
@@ -9,84 +9,20 @@ module "networking" {
   public_subnets     = ["10.0.101.0/24", "10.0.102.0/24"]
 }
 
-# 2. Firewalls & Security Groups
-module "security_groups" {
-  source       = "../../modules/security_groups"
-  project_name = var.project_name
-  environment  = var.environment
-  vpc_id       = module.networking.vpc_id
-}
-
-# 3. ECR Registries
+# 2. Container Registry (ECR)
 module "ecr" {
   source       = "../../modules/ecr"
   project_name = var.project_name
   environment  = var.environment
 }
 
-# 4. Public Load Balancer
-module "alb" {
-  source         = "../../modules/alb"
-  project_name   = var.project_name
-  environment    = var.environment
-  vpc_id         = module.networking.vpc_id
-  public_subnets = module.networking.public_subnets
-  alb_sg_id      = module.security_groups.alb_sg_id
-}
-
-# 5. Database Layer (Managed MongoDB)
-module "documentdb" {
-  source             = "../../modules/documentdb"
-  project_name       = var.project_name
-  environment        = var.environment
-  aws_region         = var.aws_region
-  vpc_id             = module.networking.vpc_id
-  private_subnets    = module.networking.private_subnets
-  db_sg_id           = module.security_groups.database_sg_id
-  db_username        = var.db_username
-  db_password        = var.db_password
-  ecs_cluster_id     = module.ecs.cluster_name
-  execution_role_arn = module.ecs.execution_role_arn
-  secret_arn         = module.secrets.secret_arn
-  app_secrets_arn    = module.secrets.secret_arn
-}
-
-# 6. Container Orchestration (ECS Fargate)
-module "ecs" {
-  source                    = "../../modules/ecs"
-  project_name              = var.project_name
-  environment               = var.environment
-  aws_region                = var.aws_region
-  app_secrets_arn           = module.secrets.secret_arn
-  private_subnets           = module.networking.private_subnets
-  frontend_sg_id            = module.security_groups.frontend_ecs_sg_id
-  backend_sg_id             = module.security_groups.backend_ecs_sg_id
-  frontend_image            = "${module.ecr.frontend_repository_url}:${var.image_tag}"
-  backend_image             = "${module.ecr.backend_repository_url}:${var.image_tag}"
-  mongodb_url               = module.documentdb.mongodb_connection_string
-  frontend_target_group_arn = module.alb.frontend_target_group_arn
-  backend_target_group_arn  = module.alb.backend_target_group_arn
-  secret_arn                = module.secrets.secret_arn
-  alb_dns_name              = module.alb.alb_dns_name
-}
-
-# 7. CI/CD IAM Roles
-module "iam" {
-  source                  = "../../modules/iam"
-  project_name            = var.project_name
-  environment             = var.environment
-  frontend_ecr_arn        = module.ecr.frontend_repository_arn
-  backend_ecr_arn         = module.ecr.backend_repository_arn
-  frontend_ecs_service_id = module.ecs.frontend_service_arn
-  backend_ecs_service_id  = module.ecs.backend_service_arn
-}
-
+# 3. Application Secrets
 module "secrets" {
   source              = "../../modules/secrets"
   project_name        = var.project_name
+  environment         = var.environment
   db_username         = var.db_username
   db_password         = var.db_password
-  environment         = var.environment
   jwt_access_secret   = var.jwt_access_secret
   jwt_refresh_secret  = var.jwt_refresh_secret
   jwt_reset_secret    = var.jwt_reset_secret
@@ -99,30 +35,12 @@ module "secrets" {
   gmail_redirect_uri  = var.gmail_redirect_uri
 }
 
-module "monitoring" {
-  source = "../../modules/monitoring"
-
-  project_name        = var.project_name
-  environment         = var.environment
-  discord_webhook_url = var.discord_webhook_url
-
-  ecs_cluster_name       = module.ecs.cluster_name
-  frontend_service_name  = module.ecs.frontend_service_name
-  backend_service_name   = module.ecs.backend_service_name
-  alb_arn_suffix         = module.alb.alb_arn_suffix
-  frontend_tg_arn_suffix = module.alb.frontend_tg_arn_suffix
-  backend_tg_arn_suffix  = module.alb.backend_tg_arn_suffix
-}
-
-output "monitoring_sns_topic_arn" {
-  value = module.monitoring.sns_topic_arn
-}
-
-output "jenkins_aws_access_key_id" {
-  value = module.iam.jenkins_access_key_id
-}
-
-output "jenkins_aws_secret_access_key" {
-  value     = module.iam.jenkins_secret_access_key
-  sensitive = true
+# 4. K3s Kubernetes Node
+module "k3s" {
+  source           = "../../modules/k3s"
+  project_name     = var.project_name
+  environment      = var.environment
+  vpc_id           = module.networking.vpc_id
+  public_subnet_id = module.networking.public_subnets[0]
+  secret_arn       = module.secrets.secret_arn
 }
