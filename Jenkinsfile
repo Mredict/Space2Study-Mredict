@@ -18,7 +18,6 @@ pipeline {
         
         HELM_RELEASE = "space2study-${params.ENV}"
         K8S_NAMESPACE = "space2study-${params.ENV}"
-        CHART_DIR    = "devops/helm"
     }
 
     stages {
@@ -51,8 +50,8 @@ pipeline {
                 stage('Helm Chart Lint & Security') {
                     steps {
                         sh """
-                            helm lint ${CHART_DIR}
-                            trivy config ${CHART_DIR} --severity HIGH,CRITICAL || true
+                            helm lint devops/helm/
+                            trivy config devops/helm/ --severity HIGH,CRITICAL || true
                         """
                     }
                 }
