@@ -44,3 +44,13 @@ module "k3s" {
   public_subnet_id = module.networking.public_subnets[0]
   secret_arn       = module.secrets.secret_arn
 }
+
+# 5. IAM for Jenkins CI/CD
+module "iam" {
+  source           = "../../modules/iam"
+  project_name     = var.project_name
+  environment      = var.environment
+  frontend_ecr_arn = module.ecr.frontend_repository_arn
+  backend_ecr_arn  = module.ecr.backend_repository_arn
+  secret_arn       = module.secrets.secret_arn
+}

@@ -1,6 +1,6 @@
 data "aws_ami" "ubuntu" {
   most_recent = true
-  owners      = ["099720109477"]
+  owners      = ["099720109477"] # Canonical
 
   filter {
     name   = "name"
@@ -8,13 +8,12 @@ data "aws_ami" "ubuntu" {
   }
 }
 
-# 1. Security Group
+# 1. Security Group for Public K3s Instance (No SSH port 22 needed from outside!)
 resource "aws_security_group" "k3s" {
   name        = "${var.project_name}-k3s-sg-${var.environment}"
-  description = "Allows direct Web traffic to NGINX and cluster administration"
+  description = "Allows Web traffic and ArgoCD webhooks"
   vpc_id      = var.vpc_id
 
-  # HTTP
   ingress {
     description = "HTTP to Ingress"
     from_port   = 80
@@ -23,7 +22,6 @@ resource "aws_security_group" "k3s" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # HTTPS
   ingress {
     description = "HTTPS to Ingress"
     from_port   = 443
@@ -32,17 +30,8 @@ resource "aws_security_group" "k3s" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # Kubernetes API
-  ingress {
-    description = "K8s API endpoint"
-    from_port   = 6443
-    to_port     = 6443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
   egress {
-    description = "Allow all outbound traffic"
+    description = "Allow outbound traffic"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -54,7 +43,7 @@ resource "aws_security_group" "k3s" {
   }
 }
 
-# 2. EC2 Instance
+# 2. EC2 Instance (t3.micro - Free Tier)
 resource "aws_instance" "k3s_server" {
   ami                    = data.aws_ami.ubuntu.id
   instance_type          = "t3.micro"
@@ -68,26 +57,25 @@ resource "aws_instance" "k3s_server" {
     delete_on_termination = true
   }
 
-  # Automatic K3s + Automatic Ingress-NGINX installation
   user_data = <<-EOF
               #!/bin/bash
               set -e
 
-              # 1. Setup 2GB Swap to protect 1GB RAM from OOM crashes
-              fallocate -l 2G /swapfile
+              # 1. Configure 2.5GB swap space to ensure stability for ArgoCD + apps
+              fallocate -l 2560M /swapfile
               chmod 600 /swapfile
               mkswap /swapfile
               swapon /swapfile
               echo '/swapfile none swap sw 0 0' >> /etc/fstab
 
-              # 2. Install basic utilities
+              # 2. Install prerequisites
               apt-get update -y
-              apt-get install -y curl unzip
+              apt-get install -y curl unzip git
 
               # 3. Pre-create K3s manifests directory
               mkdir -p /var/lib/rancher/k3s/server/manifests
 
-              # 4. Automate NGINX Ingress using K3s HelmChart CRD
+              # 4. Ingress-NGINX Auto-Deploy
               cat <<'YAML' > /var/lib/rancher/k3s/server/manifests/ingress-nginx.yaml
               apiVersion: helm.cattle.io/v1
               kind: HelmChart
@@ -108,18 +96,49 @@ resource "aws_instance" "k3s_server" {
                       type: ClusterIP
                     resources:
                       requests:
-                        cpu: 50m
-                        memory: 90Mi
+                        cpu: 40m
+                        memory: 80Mi
                       limits:
-                        cpu: 200m
-                        memory: 180Mi
+                        cpu: 150m
+                        memory: 150Mi
               YAML
 
-              # 5. Install K3s (disable Traefik and ServiceLB since NGINX uses hostPort)
+              # 5. Install K3s (disable Traefik and ServiceLB)
               curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--disable=traefik --disable=servicelb --write-kubeconfig-mode=644" sh -
 
-              # 6. Install Helm CLI locally on node
-              curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+              # 6. Wait for Kubernetes API to become ready
+              until kubectl get nodes; do sleep 3; done
+
+              # 7. Install ArgoCD
+              kubectl create namespace argocd || true
+              kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+              # 8. Deploy Space2Study Application to ArgoCD
+              cat <<'YAML' > /var/lib/rancher/k3s/server/manifests/argocd-space2study-app.yaml
+              apiVersion: argoproj.io/v1alpha1
+              kind: Application
+              metadata:
+                name: space2study-${var.environment}
+                namespace: argocd
+              spec:
+                project: default
+                source:
+                  repoURL: 'https://github.com/Mredict/Space2Study-Mredict.git'
+                  targetRevision: HEAD
+                  path: devops/helm/space2study
+                  helm:
+                    valueFiles:
+                      - values.yaml
+                destination:
+                  server: 'https://kubernetes.default.svc'
+                  namespace: space2study-${var.environment}
+                syncPolicy:
+                  automated:
+                    prune: true
+                    selfHeal: true
+                  syncOptions:
+                    - CreateNamespace=true
+              YAML
               EOF
 
   tags = {

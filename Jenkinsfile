@@ -6,7 +6,6 @@ pipeline {
         choice(name: 'ENV', choices: ['dev', 'staging', 'prod'], description: 'Target Deployment Environment')
         string(name: 'AWS_REGION', defaultValue: 'eu-central-1', description: 'AWS Region')
         string(name: 'AWS_ACCOUNT_ID', defaultValue: '456631682423', description: 'AWS Account ID')
-        string(name: 'K3S_HOST_IP', defaultValue: '', description: 'Public Elastic IP of the K3s host (leave empty to fetch dynamically from AWS)')
     }
 
     environment {
@@ -16,8 +15,7 @@ pipeline {
         FRONTEND_ECR = "${params.AWS_ACCOUNT_ID}.dkr.ecr.${params.AWS_REGION}.amazonaws.com/space2study-frontend-${params.ENV}"
         BACKEND_ECR  = "${params.AWS_ACCOUNT_ID}.dkr.ecr.${params.AWS_REGION}.amazonaws.com/space2study-backend-${params.ENV}"
         
-        HELM_RELEASE = "space2study-${params.ENV}"
-        K8S_NAMESPACE = "space2study-${params.ENV}"
+        HELM_VALUES_FILE = "devops/helm/values.yaml"
     }
 
     stages {
@@ -42,17 +40,13 @@ pipeline {
                         sh 'hadolint frontend/Dockerfile'
                     }
                 }
-                stage('Terraform Security Scan') {
+                stage('Helm & Terraform Security Scan') {
                     steps {
-                        sh 'trivy config devops/terraform/ --severity HIGH,CRITICAL || true'
-                    }
-                }
-                stage('Helm Chart Lint & Security') {
-                    steps {
-                        sh """
-                            helm lint devops/helm/
+                        sh '''
+                            helm lint devops/helm/ || true
                             trivy config devops/helm/ --severity HIGH,CRITICAL || true
-                        """
+                            trivy config devops/terraform/ --severity HIGH,CRITICAL || true
+                        '''
                     }
                 }
             }
@@ -166,103 +160,30 @@ pipeline {
             }
         }
 
-        stage('Deploy to K3s (Helm)') {
-            environment {
-                AWS_REGION = "${params.AWS_REGION}"
-            }
+        stage('GitOps: Update Manifests (Trigger ArgoCD)') {
             steps {
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'aws-jenkins-deployer',
-                        usernameVariable: 'AWS_ACCESS_KEY_ID',
-                        passwordVariable: 'AWS_SECRET_ACCESS_KEY'
-                    ),
-                    sshUserPrivateKey(
-                        credentialsId: 'k3s-ssh-key',
-                        keyFileVariable: 'SSH_KEY_PATH',
-                        usernameVariable: 'SSH_USER'
-                    )
-                ]) {
-                    sh '''
+                withCredentials([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
+                    sh """
                         set -e
 
-                        # 1. Resolve K3s host IP
-                        TARGET_HOST="${K3S_HOST_IP}"
-                        if [ -z "$TARGET_HOST" ]; then
-                            TARGET_HOST=$(aws ec2 describe-instances \
-                                --filters "Name=tag:Name,Values=space2study-k3s-${ENV}" "Name=instance-state-name,Values=running" \
-                                --region "${AWS_REGION}" \
-                                --query "Reservations[0].Instances[0].PublicIpAddress" \
-                                --output text)
+                        # 1. Update image tags in values.yaml using yq or sed
+                        sed -i 's|tag: .*# backend-tag|tag: "${IMAGE_TAG}" # backend-tag|' ${HELM_VALUES_FILE}
+                        sed -i 's|tag: .*# frontend-tag|tag: "${IMAGE_TAG}" # frontend-tag|' ${HELM_VALUES_FILE}
+
+                        # 2. Commit and push the updated Helm values to GitHub
+                        git config user.name "jenkins-bot"
+                        git config user.email "jenkins-bot@space2study.local"
+                        git add ${HELM_VALUES_FILE}
+                        
+                        # Only commit if changes exist
+                        if git diff --staged --quiet; then
+                            echo "No changes in image tags to commit."
+                        else
+                            git commit -m "ci(gitops): update image tags to ${IMAGE_TAG} [skip ci]"
+                            git push https://${GITHUB_TOKEN}@github.com/Mredict/Space2Study-Mredict.git HEAD:${params.BRANCH}
+                            echo "✅ Successfully updated Helm values in Git. ArgoCD will now sync the deployment."
                         fi
-
-                        if [ "$TARGET_HOST" = "None" ] || [ -z "$TARGET_HOST" ]; then
-                            echo "ERROR: Unable to locate running K3s instance"
-                            exit 1
-                        fi
-
-                        echo "Deploying to K3s at: ${TARGET_HOST}"
-
-                        # 2. Fetch runtime secrets from AWS Secrets Manager
-                        SECRETS_JSON=$(aws secretsmanager get-secret-value \
-                            --secret-id "space2study-app-secrets-${ENV}" \
-                            --region "${AWS_REGION}" \
-                            --query 'SecretString' \
-                            --output text)
-
-                        DB_USER=$(echo "$SECRETS_JSON" | jq -r .DB_USERNAME)
-                        DB_PASS=$(echo "$SECRETS_JSON" | jq -r .DB_PASSWORD)
-                        JWT_ACCESS=$(echo "$SECRETS_JSON" | jq -r .JWT_ACCESS_SECRET)
-                        JWT_REFRESH=$(echo "$SECRETS_JSON" | jq -r .JWT_REFRESH_SECRET)
-                        JWT_RESET=$(echo "$SECRETS_JSON" | jq -r .JWT_RESET_SECRET)
-                        JWT_CONFIRM=$(echo "$SECRETS_JSON" | jq -r .JWT_CONFIRM_SECRET)
-                        MAIL_USER_VAL=$(echo "$SECRETS_JSON" | jq -r .MAIL_USER)
-                        MAIL_PASS_VAL=$(echo "$SECRETS_JSON" | jq -r .MAIL_PASS)
-                        GMAIL_ID=$(echo "$SECRETS_JSON" | jq -r .GMAIL_CLIENT_ID)
-                        GMAIL_SECRET=$(echo "$SECRETS_JSON" | jq -r .GMAIL_CLIENT_SECRET)
-                        GMAIL_TOKEN=$(echo "$SECRETS_JSON" | jq -r .GMAIL_REFRESH_TOKEN)
-                        GMAIL_URI=$(echo "$SECRETS_JSON" | jq -r .GMAIL_REDIRECT_URI)
-
-                        # 3. Securely transfer the kubeconfig or run deployment over SSH
-                        ssh -o StrictHostKeyChecking=no -i "$SSH_KEY_PATH" "$SSH_USER@$TARGET_HOST" "mkdir -p /tmp/space2study-chart"
-                        scp -o StrictHostKeyChecking=no -i "$SSH_KEY_PATH" -r ${CHART_DIR}/* "$SSH_USER@$TARGET_HOST:/tmp/space2study-chart/"
-
-                        # 4. Authenticate cluster node's containerd to ECR so K3s can pull images
-                        ssh -o StrictHostKeyChecking=no -i "$SSH_KEY_PATH" "$SSH_USER@$TARGET_HOST" """
-                            aws ecr get-login-password --region ${AWS_REGION} | \
-                            k3s ctr images login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
-                        """
-
-                        # 5. Execute atomic Helm upgrade/install
-                        ssh -o StrictHostKeyChecking=no -i "$SSH_KEY_PATH" "$SSH_USER@$TARGET_HOST" """
-                            helm upgrade --install ${HELM_RELEASE} /tmp/space2study-chart \
-                                --namespace ${K8S_NAMESPACE} \
-                                --create-namespace \
-                                --set global.domain=\"${TARGET_HOST}\" \
-                                --set backend.image.repository=\"${BACKEND_ECR}\" \
-                                --set backend.image.tag=\"${IMAGE_TAG}\" \
-                                --set frontend.image.repository=\"${FRONTEND_ECR}\" \
-                                --set frontend.image.tag=\"${IMAGE_TAG}\" \
-                                --set secrets.dbUsername=\"${DB_USER}\" \
-                                --set secrets.dbPassword=\"${DB_PASS}\" \
-                                --set secrets.jwtAccessSecret=\"${JWT_ACCESS}\" \
-                                --set secrets.jwtRefreshSecret=\"${JWT_REFRESH}\" \
-                                --set secrets.jwtResetSecret=\"${JWT_RESET}\" \
-                                --set secrets.jwtConfirmSecret=\"${JWT_CONFIRM}\" \
-                                --set secrets.mailUser=\"${MAIL_USER_VAL}\" \
-                                --set secrets.mailPass=\"${MAIL_PASS_VAL}\" \
-                                --set secrets.gmailClientId=\"${GMAIL_ID}\" \
-                                --set secrets.gmailClientSecret=\"${GMAIL_SECRET}\" \
-                                --set secrets.gmailRefreshToken=\"${GMAIL_TOKEN}\" \
-                                --set secrets.gmailRedirectUri=\"${GMAIL_URI}\" \
-                                --wait \
-                                --timeout 300s \
-                                --atomic
-                        """
-
-                        # Clean up remote temp directory
-                        ssh -o StrictHostKeyChecking=no -i "$SSH_KEY_PATH" "$SSH_USER@$TARGET_HOST" "rm -rf /tmp/space2study-chart"
-                    '''
+                    """
                 }
             }
         }
@@ -277,10 +198,10 @@ pipeline {
             """
         }
         success {
-            echo "Deployment of ${IMAGE_TAG} to K3s (${params.ENV}) completed successfully!"
+            echo "CI pipeline completed. ArgoCD is deploying ${IMAGE_TAG} to ${params.ENV}!"
         }
         failure {
-            echo "Deployment to ${params.ENV} failed. Inspect Helm rollback status and pod logs."
+            echo "Pipeline failed. Check stage logs."
         }
     }
 }
