@@ -2,48 +2,90 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: mongodb
-  labels:
-    app: mongodb
-    {{- include "space2study.labels" . | nindent 4 }}
+  namespace: {{ .Values.namespace }}
+  labels: { app: mongodb }
 spec:
-  serviceName: "mongodb"
-  replicas: 1
+  serviceName: mongodb-headless
+  replicas: {{ .Values.mongodb.replicas }}
   selector:
-    matchLabels:
-      app: mongodb
+    matchLabels: { app: mongodb }
   template:
     metadata:
-      labels:
-        app: mongodb
+      labels: { app: mongodb }
     spec:
+      serviceAccountName: mongodb
+      automountServiceAccountToken: false
+      # One replica per node - if all 3 landed on one node, that node's
+      # failure would take the whole database with it despite "3 replicas".
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels: { app: mongodb }
       securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
         fsGroup: 999
+        seccompProfile: { type: RuntimeDefault }
       containers:
         - name: mongodb
-          image: "{{ .Values.mongodb.image.repository }}:{{ .Values.mongodb.image.tag }}"
-          imagePullPolicy: {{ .Values.mongodb.image.pullPolicy }}
-          securityContext:
-            runAsUser: 999
-            runAsGroup: 999
-            runAsNonRoot: true
-            allowPrivilegeEscalation: false
+          image: mongo:7.0.14
+          command:
+            - mongod
+            - --replSet=rs0
+            - --bind_ip_all
+            - --auth
+            - --keyFile=/etc/mongo-keyfile/keyfile
           ports:
-            - containerPort: 27017
-              name: mongodb
-          envFrom:
-            - secretRef:
-                name: {{ include "space2study.fullname" . }}-secrets
+            - containerPort: {{ .Values.mongodb.port }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
           resources:
             {{- toYaml .Values.mongodb.resources | nindent 12 }}
+          env:
+            - name: MONGO_INITDB_ROOT_USERNAME
+              valueFrom:
+                secretKeyRef: { name: mongodb-credentials, key: MONGO_INITDB_ROOT_USERNAME }
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: mongodb-credentials, key: MONGO_INITDB_ROOT_PASSWORD }
           volumeMounts:
-            - name: mongodb-storage
+            - name: data
               mountPath: /data/db
+            - name: keyfile
+              mountPath: /etc/mongo-keyfile
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+          readinessProbe:
+            exec:
+              command: ["mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          livenessProbe:
+            exec:
+              command: ["mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+            initialDelaySeconds: 30
+            periodSeconds: 20
+      volumes:
+        - name: keyfile
+          secret:
+            secretName: mongodb-credentials
+            defaultMode: 0400
+            items:
+              - { key: keyfile, path: keyfile }
+        - name: tmp
+          emptyDir: {}
   volumeClaimTemplates:
     - metadata:
-        name: mongodb-storage
+        name: data
       spec:
-        accessModes: [ "ReadWriteOnce" ]
-        storageClassName: {{ .Values.mongodb.storage.storageClassName }}
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: {{ .Values.mongodb.storageClassName }}
         resources:
           requests:
-            storage: {{ .Values.mongodb.storage.size }}
+            storage: {{ .Values.mongodb.storageSize }}

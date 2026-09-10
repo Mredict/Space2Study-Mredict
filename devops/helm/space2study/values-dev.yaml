@@ -1,0 +1,34 @@
+namespace: space2study-dev
+
+image:
+  registry: "<AWS_ACCOUNT_ID>.dkr.ecr.eu-central-1.amazonaws.com"
+
+frontend:
+  replicas: 1
+  image:
+    tag: latest # overwritten by Jenkins's "Update GitOps Manifest" stage on every dev build
+  autoscaling:
+    minReplicas: 1
+    maxReplicas: 2
+
+backend:
+  replicas: 1
+  image:
+    tag: latest # overwritten by Jenkins's "Update GitOps Manifest" stage on every dev build
+  autoscaling:
+    minReplicas: 1
+    maxReplicas: 3
+  env:
+    SERVER_URL: "https://<NODE_PUBLIC_IP>"
+    CLIENT_URL: "https://<NODE_PUBLIC_IP>"
+    COOKIE_DOMAIN: "<NODE_PUBLIC_IP>"
+
+mongodb:
+  replicas: 3
+
+externalSecrets:
+  appSecretsName: space2study-app-secrets-dev
+
+resourceQuota:
+  cpu: "3"
+  memory: 4Gi

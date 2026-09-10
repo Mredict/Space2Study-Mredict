@@ -1,7 +1,9 @@
 .DS_Store
 Thumbs.db
 
-**/.terraform/*
+kubeconfig-*.yaml
+
+.terraform/
 
 *.tfstate
 *.tfstate.*
@@ -15,9 +17,9 @@ terraform.tfvars
 plan.txt
 plan.json
 
-devops/certs/*.key
-devops/certs/*.srl
-devops/certs/*.csr
+*.pem
+*.key
+*-sbom.json
 
 override.tf
 override.tf.json
@@ -70,9 +72,6 @@ secrets.env
 .vagrant/
 .vagrant/*private_key
 .vagrant/machines/**/virtualbox/private_key
-
-*.pem
-*.key
 id_rsa
 id_rsa.pub
 known_hosts

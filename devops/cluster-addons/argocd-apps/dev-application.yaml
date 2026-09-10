@@ -1,0 +1,28 @@
+# EDIT repoURL and targetRevision before applying - these are placeholders.
+# `path` assumes the Helm chart lives at devops/helm/space2study inside that
+# repo; adjust if your actual layout differs (it has, repeatedly, over the
+# course of this project - verify before applying, don't assume).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dev-space2study
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Mredict/Space2Study-Mredict.git
+    targetRevision: main
+    path: devops/helm/space2study
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-dev.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: space2study-dev
+  syncPolicy:
+    automated:
+      prune: true # remove resources ArgoCD manages that are no longer in git
+      selfHeal: true # revert manual kubectl/helm changes back to what git says - drift correction is the point of GitOps
+    syncOptions:
+      - CreateNamespace=true

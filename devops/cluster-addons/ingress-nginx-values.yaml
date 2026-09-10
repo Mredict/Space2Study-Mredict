@@ -1,0 +1,24 @@
+# helm install ingress-nginx ingress-nginx/ingress-nginx \
+#   -n ingress-nginx --create-namespace -f cluster-addons/ingress-nginx-values.yaml
+#
+# hostNetwork + DaemonSet means every k3s node terminates 80/443 directly -
+# no AWS load balancer (~$18+/month saved). Reach the app at any node's
+# public IP; the init node's Elastic IP is the stable one since it doesn't
+# change across stop/start.
+
+controller:
+  kind: DaemonSet
+  hostNetwork: true
+  hostPort:
+    enabled: true
+  dnsPolicy: ClusterFirstWithHostNet
+  service:
+    enabled: false # no Service of type LoadBalancer - hostNetwork handles it
+  admissionWebhooks:
+    enabled: true
+  resources:
+    requests: { cpu: 50m, memory: 90Mi }
+    limits: { cpu: 200m, memory: 250Mi }
+  config:
+    use-forwarded-headers: "true"
+    ssl-redirect: "true"

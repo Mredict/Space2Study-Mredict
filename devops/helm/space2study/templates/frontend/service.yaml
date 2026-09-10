@@ -1,16 +1,10 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "space2study.fullname" . }}-frontend
-  labels:
-    app: frontend
-    {{- include "space2study.labels" . | nindent 4 }}
+  name: frontend
+  namespace: {{ .Values.namespace }}
 spec:
-  type: ClusterIP
+  selector: { app: frontend }
   ports:
-    - port: {{ .Values.frontend.service.port }}
-      targetPort: http
-      protocol: TCP
-      name: http
-  selector:
-    app: frontend
+    - port: {{ .Values.frontend.port }}
+      targetPort: {{ .Values.frontend.port }}

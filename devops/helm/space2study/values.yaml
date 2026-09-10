@@ -1,78 +1,76 @@
-global:
-  environment: dev
-  domain: ""
+namespace: space2study
 
-# Ingress Controller Configuration
-ingress:
-  enabled: true
-  className: "nginx"
-  annotations:
-    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
-    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+domain: "" # empty = access via node IP with self-signed cert (see README)
 
-# MongoDB Database Engine
-mongodb:
-  enabled: true
-  image:
-    repository: mongo
-    tag: "8.3.8-noble"
-    pullPolicy: IfNotPresent
-  storage:
-    size: 5Gi
-    storageClassName: local-path
-  resources:
-    requests:
-      cpu: 50m
-      memory: 128Mi
-    limits:
-      cpu: 250m
-      memory: 256Mi
+image:
+  registry: "" # set per-environment: <account>.dkr.ecr.<region>.amazonaws.com
 
-# Backend API
-backend:
-  replicaCount: 1
-  image:
-    repository: 456631682423.dkr.ecr.eu-central-1.amazonaws.com/space2study-backend-dev
-    tag: "latest" # backend-tag
-    pullPolicy: Always
-  service:
-    port: 8080
-  resources:
-    requests:
-      cpu: 50m
-      memory: 192Mi
-    limits:
-      cpu: 300m
-      memory: 384Mi
-
-# Frontend UI
 frontend:
-  replicaCount: 1
   image:
-    repository: 456631682423.dkr.ecr.eu-central-1.amazonaws.com/space2study-frontend-dev
-    tag: "latest" # frontend-tag
-    pullPolicy: Always
-  service:
-    port: 8080
+    repository: space2study-frontend-dev
+    tag: latest
+  replicas: 2
+  port: 8080
   resources:
-    requests:
-      cpu: 20m
-      memory: 64Mi
-    limits:
-      cpu: 100m
-      memory: 128Mi
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { cpu: 250m, memory: 256Mi }
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 4
+    targetCPUUtilizationPercentage: 70
 
-# Environment Secrets
-secrets:
-  dbUsername: "dbadmin"
-  dbPassword: "ChangeMeInDevSecOps123!"
-  jwtAccessSecret: "access_secret_sample"
-  jwtRefreshSecret: "refresh_secret_sample"
-  jwtResetSecret: "reset_secret_sample"
-  jwtConfirmSecret: "confirm_secret_sample"
-  mailUser: "admin@space2study.com"
-  mailPass: "mail_password"
-  gmailClientId: "sample_client_id"
-  gmailClientSecret: "sample_client_secret"
-  gmailRefreshToken: "sample_refresh_token"
-  gmailRedirectUri: "https://developers.google.com/oauthplayground"
+backend:
+  image:
+    repository: space2study-backend-dev
+    tag: latest
+  replicas: 2
+  port: 8080
+  resources:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits: { cpu: 500m, memory: 512Mi }
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+  env:
+    NODE_ENV: production
+    SERVER_PORT: "8080"
+    JWT_ACCESS_EXPIRES_IN: 1h
+    JWT_REFRESH_EXPIRES_IN: 7d
+    JWT_RESET_EXPIRES_IN: 1h
+    JWT_CONFIRM_EXPIRES_IN: 1h
+    MAIL_FIRSTNAME: Admin
+    MAIL_LASTNAME: Space2Study
+
+mongodb:
+  replicas: 3
+  port: 27017
+  storageClassName: local-path
+  storageSize: 10Gi
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { cpu: 500m, memory: 768Mi }
+
+externalSecrets:
+  # Populated per-environment with the actual Secrets Manager ARN/region -
+  # see values-dev.yaml.
+  region: eu-central-1
+  appSecretsName: space2study-app-secrets-dev
+
+ingress:
+  className: nginx
+  tlsSecretName: space2study-tls-selfsigned
+
+networkPolicy:
+  enabled: true
+
+podDisruptionBudget:
+  minAvailable: 1
+
+resourceQuota:
+  enabled: true
+  cpu: "4"
+  memory: 6Gi
+  pods: "40"

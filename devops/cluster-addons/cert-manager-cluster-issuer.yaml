@@ -1,0 +1,15 @@
+# No domain yet, so this is a self-signed CA issuer - it gets you a real
+# cert-manager-managed cert (auto-renewed, never checked into git, unlike the
+# old design's `file("../../certs/alb_selfsigned.key")` which committed a
+# private key straight into the Terraform repo). Browsers will still show a
+# trust warning since there's no public CA behind it - that's expected for a
+# no-domain lab. The day you register a domain, swap this for a Let's Encrypt
+# ClusterIssuer (acme, http01 or dns01) and nothing else in the chart changes
+# except values.yaml's `domain` field and the annotation Helm already sets.
+
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned-issuer
+spec:
+  selfSigned: {}

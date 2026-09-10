@@ -1,41 +1,58 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "space2study.fullname" . }}-frontend
-  labels:
-    app: frontend
-    {{- include "space2study.labels" . | nindent 4 }}
+  name: frontend
+  namespace: {{ .Values.namespace }}
+  labels: { app: frontend }
 spec:
-  replicas: {{ .Values.frontend.replicaCount }}
+  replicas: {{ .Values.frontend.replicas }}
   selector:
-    matchLabels:
-      app: frontend
+    matchLabels: { app: frontend }
   template:
     metadata:
-      labels:
-        app: frontend
+      labels: { app: frontend }
     spec:
+      serviceAccountName: frontend
+      automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
         runAsUser: 101
+        runAsGroup: 101
+        fsGroup: 101
+        seccompProfile: { type: RuntimeDefault }
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector: { matchLabels: { app: frontend } }
       containers:
         - name: frontend
-          image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
-          imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
+          image: "{{ .Values.image.registry }}/{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
+          imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: {{ .Values.frontend.service.port }}
-              name: http
+            - containerPort: {{ .Values.frontend.port }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
           resources:
             {{- toYaml .Values.frontend.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: var-run
+              mountPath: /var/run
+            - name: var-cache
+              mountPath: /var/cache/nginx
           livenessProbe:
-            httpGet:
-              path: /
-              port: http
-            initialDelaySeconds: 15
-            periodSeconds: 10
+            httpGet: { path: /, port: {{ .Values.frontend.port }} }
+            initialDelaySeconds: 10
+            periodSeconds: 20
           readinessProbe:
-            httpGet:
-              path: /
-              port: http
+            httpGet: { path: /, port: {{ .Values.frontend.port }} }
             initialDelaySeconds: 5
-            periodSeconds: 5
+            periodSeconds: 10
+      volumes:
+        - { name: tmp, emptyDir: {} }
+        - { name: var-run, emptyDir: {} }
+        - { name: var-cache, emptyDir: {} }

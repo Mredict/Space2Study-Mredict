@@ -1,0 +1,142 @@
+---
+# Installs every tool the Jenkinsfile invokes that isn't already covered by
+# common/docker_setup/agent_setup: trivy, cosign, syft, kyverno CLI, helm,
+# kubectl. Without this role every scan/sign/policy/deploy stage in the
+# pipeline fails at "command not found" - these were referenced in the
+# Jenkinsfile but never actually provisioned anywhere.
+#
+# NOTE ON CHECKSUMS: get_url below does not pin a `checksum:` for these
+# downloads because I don't have verified hashes for these specific
+# versions to give you - a wrong-looking-right hash would be worse than
+# none. Recommended follow-up: download each once, verify against the
+# project's published checksum (trivy/syft ship a companion checksums
+# file, cosign's release page lists SHA256 sums), then add `checksum:
+# sha256:<value>` to the matching task so future re-provisions verify
+# automatically.
+
+- name: Check whether trivy is already at the pinned version
+  ansible.builtin.command: trivy --version
+  register: ci_tools_trivy_check
+  changed_when: false
+  failed_when: false
+
+- name: Fetch + install trivy if missing or wrong version
+  when: ci_tools_trivy_check.rc != 0 or trivy_version not in (ci_tools_trivy_check.stdout | default(''))
+  block:
+    - ansible.builtin.get_url:
+        url: "{{ trivy_deb_url }}"
+        dest: "/tmp/trivy_{{ trivy_version }}.deb"
+        mode: "0644"
+    - ansible.builtin.apt:
+        deb: "/tmp/trivy_{{ trivy_version }}.deb"
+
+- name: Check cosign version
+  ansible.builtin.command: cosign version
+  register: ci_tools_cosign_check
+  changed_when: false
+  failed_when: false
+
+- name: Install cosign (pinned binary)
+  when: ci_tools_cosign_check.rc != 0 or cosign_version not in (ci_tools_cosign_check.stdout | default(''))
+  ansible.builtin.get_url:
+    url: "{{ cosign_bin_url }}"
+    dest: /usr/local/bin/cosign
+    mode: "0755"
+
+- name: Check syft version
+  ansible.builtin.command: syft version
+  register: ci_tools_syft_check
+  changed_when: false
+  failed_when: false
+
+- name: Fetch + install syft (.deb, pinned version)
+  when: ci_tools_syft_check.rc != 0 or syft_version not in (ci_tools_syft_check.stdout | default(''))
+  block:
+    - ansible.builtin.get_url:
+        url: "{{ syft_deb_url }}"
+        dest: "/tmp/syft_{{ syft_version }}.deb"
+        mode: "0644"
+    - ansible.builtin.apt:
+        deb: "/tmp/syft_{{ syft_version }}.deb"
+
+- name: Check kyverno CLI version
+  ansible.builtin.command: kyverno version
+  register: ci_tools_kyverno_check
+  changed_when: false
+  failed_when: false
+
+- name: Fetch + install Kyverno CLI (pinned tarball)
+  when: ci_tools_kyverno_check.rc != 0 or kyverno_cli_version not in (ci_tools_kyverno_check.stdout | default(''))
+  block:
+    - ansible.builtin.file:
+        path: /tmp/kyverno-cli-extract
+        state: directory
+        mode: "0755"
+    - ansible.builtin.get_url:
+        url: "{{ kyverno_cli_url }}"
+        dest: "/tmp/kyverno-cli_{{ kyverno_cli_version }}.tar.gz"
+        mode: "0644"
+    - ansible.builtin.unarchive:
+        src: "/tmp/kyverno-cli_{{ kyverno_cli_version }}.tar.gz"
+        dest: /tmp/kyverno-cli-extract
+        remote_src: true
+    # The tarball's internal layout isn't something I could verify without
+    # downloading it, so locate the binary rather than assume a fixed path.
+    - ansible.builtin.find:
+        paths: /tmp/kyverno-cli-extract
+        patterns: "kyverno"
+        recurse: true
+        file_type: file
+      register: ci_tools_kyverno_binary
+    - ansible.builtin.copy:
+        src: "{{ ci_tools_kyverno_binary.files[0].path }}"
+        dest: /usr/local/bin/kyverno
+        mode: "0755"
+        remote_src: true
+
+- name: Check kubectl version
+  ansible.builtin.command: kubectl version --client
+  register: ci_tools_kubectl_check
+  changed_when: false
+  failed_when: false
+
+- name: Install kubectl (pinned, matches k3s server minor version)
+  when: ci_tools_kubectl_check.rc != 0 or kubectl_version not in (ci_tools_kubectl_check.stdout | default(''))
+  ansible.builtin.get_url:
+    url: "{{ kubectl_url }}"
+    dest: /usr/local/bin/kubectl
+    mode: "0755"
+
+- name: Check helm version
+  ansible.builtin.command: helm version --short
+  register: ci_tools_helm_check
+  changed_when: false
+  failed_when: false
+
+- name: Fetch + install Helm
+  when: ci_tools_helm_check.rc != 0 or helm_version not in (ci_tools_helm_check.stdout | default(''))
+  block:
+    - ansible.builtin.get_url:
+        url: "{{ helm_tarball_url }}"
+        dest: "/tmp/helm-{{ helm_version }}.tar.gz"
+        mode: "0644"
+    - ansible.builtin.unarchive:
+        src: "/tmp/helm-{{ helm_version }}.tar.gz"
+        dest: /tmp
+        remote_src: true
+    - ansible.builtin.copy:
+        src: "/tmp/linux-amd64/helm"
+        dest: /usr/local/bin/helm
+        mode: "0755"
+        remote_src: true
+
+- name: Verify every tool is on PATH and reports a version
+  ansible.builtin.command: "{{ item }}"
+  loop:
+    - trivy --version
+    - cosign version
+    - syft version
+    - kyverno version
+    - kubectl version --client
+    - helm version --short
+  changed_when: false

@@ -1,6 +1,6 @@
 apiVersion: v2
 name: space2study
-description: Helm chart for Space2Study DevSecOps microservices
+description: Space2Study - frontend, backend, and self-hosted MongoDB replica set
 type: application
-version: 0.1.0
+version: 1.0.0
 appVersion: "1.0.0"

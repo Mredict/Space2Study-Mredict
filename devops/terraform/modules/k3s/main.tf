@@ -8,42 +8,8 @@ data "aws_ami" "ubuntu" {
   }
 }
 
-# 1. Security Group for Public K3s Instance (No SSH port 22 needed from outside!)
-resource "aws_security_group" "k3s" {
-  name        = "${var.project_name}-k3s-sg-${var.environment}"
-  description = "Allows Web traffic and ArgoCD webhooks"
-  vpc_id      = var.vpc_id
 
-  ingress {
-    description = "HTTP to Ingress"
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    description = "HTTPS to Ingress"
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    description = "Allow outbound traffic"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name = "${var.project_name}-k3s-sg-${var.environment}"
-  }
-}
-
-# 2. EC2 Instance (t3.micro - Free Tier)
+# 1. EC2 Instance (t3.micro - Free Tier)
 resource "aws_instance" "k3s_server" {
   ami                    = data.aws_ami.ubuntu.id
   instance_type          = "t3.micro"
@@ -103,7 +69,7 @@ resource "aws_instance" "k3s_server" {
                         memory: 150Mi
               YAML
 
-              # 5. Install K3s (disable Traefik and ServiceLB)
+              # 5. Install K3s
               curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--disable=traefik --disable=servicelb --write-kubeconfig-mode=644" sh -
 
               # 6. Wait for Kubernetes API to become ready
@@ -146,7 +112,7 @@ resource "aws_instance" "k3s_server" {
   }
 }
 
-# 3. Elastic IP
+# 2. Elastic IP
 resource "aws_eip" "k3s" {
   instance = aws_instance.k3s_server.id
   domain   = "vpc"

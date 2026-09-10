@@ -1,7 +1,7 @@
-# 1. Managed Deployment Policy (ECR + ECS permissions)
+# 1. Managed Deployment Policy
 resource "aws_iam_policy" "jenkins_deployment_policy" {
   name        = "${var.project_name}-deployment-policy-${var.environment}"
-  description = "Allows Jenkins to push ECR images and trigger ECS deployments"
+  description = "Allows Jenkins to push ECR images, locate K3s instances, and read runtime secrets"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -31,30 +31,22 @@ resource "aws_iam_policy" "jenkins_deployment_policy" {
         ]
       },
       {
-        Sid    = "ECSTriggerDeploy"
+        Sid    = "EC2Discovery"
         Effect = "Allow"
         Action = [
-          "ecs:UpdateService",
-          "ecs:DescribeServices",
-          "ecs:DescribeTaskDefinition",
-          "ecs:RegisterTaskDefinition"
+          "ec2:DescribeInstances"
         ]
         Resource = "*"
       },
       {
-        Sid    = "PassRolesToECS"
+        Sid    = "SecretsManagerRead"
         Effect = "Allow"
         Action = [
-          "iam:PassRole"
+          "secretsmanager:GetSecretValue"
         ]
         Resource = [
-          "arn:aws:iam::*:role/${var.project_name}-ecs-*-${var.environment}"
+          var.secret_arn
         ]
-        Condition = {
-          StringEquals = {
-            "iam:PassedToService" = "ecs-tasks.amazonaws.com"
-          }
-        }
       }
     ]
   })
