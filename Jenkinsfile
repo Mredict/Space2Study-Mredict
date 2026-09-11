@@ -54,9 +54,9 @@ pipeline {
                 stage('IaC Security (Trivy)') {
                     steps {
                         sh '''
-                            trivy config terraform-k3s/ --exit-code 0 --severity CRITICAL,HIGH
+                            trivy config devops/terraform-k3s/ --exit-code 0 --severity CRITICAL,HIGH
                             trivy config devops/helm/space2study/ --exit-code 0 --severity CRITICAL,HIGH
-                            trivy config cluster-addons/ --exit-code 0 --severity CRITICAL,HIGH
+                            trivy config devops/cluster-addons/ --exit-code 0 --severity CRITICAL,HIGH
                         '''
                     }
                 }
