@@ -42,6 +42,8 @@ spec:
             - containerPort: {{ .Values.mongodb.port }}
           securityContext:
             allowPrivilegeEscalation: false
+            privileged: false
+            runAsNonRoot: true
             readOnlyRootFilesystem: true
             capabilities: { drop: ["ALL"] }
           resources:

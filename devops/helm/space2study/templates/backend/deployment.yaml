@@ -33,6 +33,8 @@ spec:
             - containerPort: {{ .Values.backend.port }}
           securityContext:
             allowPrivilegeEscalation: false
+            privileged: false
+            runAsNonRoot: true
             readOnlyRootFilesystem: true
             capabilities: { drop: ["ALL"] }
           resources:
