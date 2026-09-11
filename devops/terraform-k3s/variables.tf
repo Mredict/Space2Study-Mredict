@@ -19,21 +19,23 @@ variable "api_server_allowed_cidrs" {
   type = list(string)
 }
 
-variable "node_instance_type" {
-  description = "Instance type for the k3s server nodes (control-plane + worker combined)"
+variable "control_plane_instance_type" {
+  description = "Instance type for the control plane node"
+
+  type    = string
+  default = "t3.small"
+}
+
+variable "worker_instance_type" {
+  description = "Instance type for the worker nodes"
   type        = string
   default     = "t3.small"
 }
 
-variable "node_count" {
-  description = "Number of k3s server nodes (odd number for embedded-etcd quorum: 1 or 3)"
-  type        = number
-  default     = 3
-
-  validation {
-    condition     = contains([1, 3, 5], var.node_count)
-    error_message = "node_count must be 1, 3, or 5 (etcd quorum requires an odd number)."
-  }
+variable "worker_count" {
+  description = "MongoDB's replica count."
+  type    = number
+  default = 2
 }
 
 variable "root_volume_gb" {
@@ -42,19 +44,19 @@ variable "root_volume_gb" {
 }
 
 variable "mongo_data_volume_gb" {
-  description = "Size of the extra EBS volume attached to each node for local MongoDB data (used by local-path storage class, see README on the EBS CSI alternative)"
+  description = "Size of the extra EBS volume attached to each node for local MongoDB data"
   type        = number
   default     = 15
 }
 
 variable "budget_limit_usd" {
-  description = "Hard monthly budget ceiling to alert against. You said you have $100 total - alerts fire well before that."
+  description = "Hard monthly budget ceiling"
   type        = number
   default     = 100
 }
 
 variable "budget_alert_emails" {
-  description = "Emails to notify on budget thresholds, in addition to the Discord webhook"
+  description = "Emails to notify on budget thresholds"
   type        = list(string)
   default     = []
 }
@@ -64,13 +66,7 @@ variable "discord_webhook_url" {
   sensitive = true
 }
 
-variable "jenkins_ca_cert_path" {
-  description = "Path to the self-managed CA public certificate PEM (see scripts/generate-jenkins-ca.sh)"
-  type        = string
-  default     = "../pki/jenkins-ca.crt"
-}
-
-# ---- Application secrets
+# ---- Application secrets ----
 
 variable "db_username" {
   type    = string

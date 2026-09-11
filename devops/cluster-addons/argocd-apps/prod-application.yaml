@@ -1,10 +1,4 @@
-# Same repo/chart as dev, different values file, and deliberately NO
-# `syncPolicy.automated` block - this is what makes prod require a manual
-# `argocd app sync prod-space2study` (CLI) or a click in the UI, replacing
-# the manual-approval gate that used to live in the Jenkinsfile. Jenkins
-# still writes the new image tag into values-prod.yaml and pushes it (see
-# the Jenkinsfile's "Update GitOps Manifest" stage), but nothing gets
-# applied to the cluster until a human explicitly triggers the sync.
+# EDIT repoURL and targetRevision before applying
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

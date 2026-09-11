@@ -1,10 +1,5 @@
 #!/usr/bin/env bash
-# One-time setup after the cluster first comes up. Re-running is safe (helm
-# upgrade --install is idempotent); the ESO secret step is skipped if it
-# already exists.
-#
-# Prereqs: KUBECONFIG pointed at the cluster (see get-kubeconfig.sh), helm,
-# and you've run `terraform apply` in terraform-k3s/ already.
+# One-time setup after the cluster first comes up. Re-running is safe
 set -euo pipefail
 
 echo "== ingress-nginx =="
@@ -25,14 +20,9 @@ helm repo add external-secrets https://charts.external-secrets.io --force-update
 helm upgrade --install external-secrets external-secrets/external-secrets \
   -n external-secrets --create-namespace
 
-# Same class of race as cert-manager above, just missed here originally:
-# the CRDs (ClusterSecretStore, ExternalSecret, etc.) take a moment to
-# register with the API server after Helm installs the chart. Applying a
-# ClusterSecretStore before that finishes fails with "no matches for kind
-# ClusterSecretStore" - a CRD-registration gap, not a controller-readiness
-# one, so wait on the CRD's own Established condition specifically rather
-# than on a Deployment being Available.
 kubectl wait --for condition=Established --timeout=120s crd/clustersecretstores.external-secrets.io
+
+kubectl wait --for=condition=Available deployment/external-secrets-webhook -n external-secrets --timeout=120s
 
 echo "== Seeding the ESO credential (from Terraform outputs, never git) =="
 if ! kubectl get secret aws-secrets-manager-credentials -n external-secrets >/dev/null 2>&1; then

@@ -1,9 +1,9 @@
 namespace: space2study
 
-domain: "" # empty = access via node IP with self-signed cert (see README)
+domain: ""
 
 image:
-  registry: "" # set per-environment: <account>.dkr.ecr.<region>.amazonaws.com
+  registry: ""
 
 frontend:
   image:

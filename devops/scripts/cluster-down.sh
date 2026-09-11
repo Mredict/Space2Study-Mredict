@@ -7,11 +7,11 @@ PROJECT="${1:-space2study}"
 ENV="${2:-dev}"
 
 IDS=$(aws ec2 describe-instances \
-  --filters "Name=tag:Name,Values=${PROJECT}-k3s-node-*-${ENV}" "Name=instance-state-name,Values=running" \
+  --filters "Name=tag:Name,Values=${PROJECT}-k3s-*-${ENV}" "Name=instance-state-name,Values=running" \
   --query "Reservations[].Instances[].InstanceId" --output text)
 
 if [ -z "$IDS" ]; then
-  echo "No running nodes found matching ${PROJECT}-k3s-node-*-${ENV}."
+  echo "No running nodes found matching ${PROJECT}-k3s-*-${ENV}."
   exit 0
 fi
 

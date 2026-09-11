@@ -1,13 +1,6 @@
 # helm install argocd argo/argo-cd -n argocd --create-namespace \
 #   --version 10.8.1 -f cluster-addons/argocd-values.yaml
-#
-# Trimmed deliberately: your nodes had 416-780Mi available with JUST the
-# other add-ons running (ingress-nginx, cert-manager, external-secrets,
-# Kyverno) - a full ArgoCD install (Dex SSO, notifications-controller,
-# applicationset-controller, HA-mode redis) would be a meaningfully heavier
-# addition on top of that. This disables the pieces you don't need for two
-# static Applications with plain admin-login auth, and sets small explicit
-# resource requests on everything that's left.
+
 
 dex:
   enabled: false # no SSO needed - built-in admin login is enough for a lab
@@ -22,11 +15,6 @@ controller:
   resources:
     requests: { cpu: 50m, memory: 128Mi }
     limits: { cpu: 250m, memory: 384Mi }
-  # Kyverno's require-non-root policy (cluster-addons/kyverno-policies/)
-  # applies to every namespace including this one - explicit here rather
-  # than trusting the chart's own defaults to already satisfy it, since a
-  # Kyverno rejection at pod-admission time is a confusing way to discover
-  # ArgoCD itself won't start.
   podSecurityContext:
     runAsNonRoot: true
 
@@ -36,9 +24,6 @@ server:
     limits: { cpu: 150m, memory: 192Mi }
   podSecurityContext:
     runAsNonRoot: true
-  # No separate LoadBalancer/Ingress for the ArgoCD UI - reach it via
-  # `kubectl port-forward svc/argocd-server -n argocd 8080:443` when you
-  # need it, rather than exposing another public endpoint on your 3 nodes.
   service:
     type: ClusterIP
 
@@ -58,4 +43,4 @@ redis:
 
 configs:
   params:
-    server.insecure: true # terminating TLS at ingress-nginx isn't wired up for ArgoCD's own UI yet - plain HTTP behind port-forward only, not exposed publicly
+    server.insecure: true

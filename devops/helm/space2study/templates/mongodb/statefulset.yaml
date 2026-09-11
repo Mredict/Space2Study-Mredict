@@ -15,14 +15,14 @@ spec:
     spec:
       serviceAccountName: mongodb
       automountServiceAccountToken: false
-      # One replica per node - if all 3 landed on one node, that node's
-      # failure would take the whole database with it despite "3 replicas".
       affinity:
         podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - topologyKey: kubernetes.io/hostname
-              labelSelector:
-                matchLabels: { app: mongodb }
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels: { app: mongodb }
       securityContext:
         runAsNonRoot: true
         runAsUser: 999

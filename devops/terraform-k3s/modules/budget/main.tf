@@ -1,5 +1,4 @@
 # AWS Budgets layered alerts at 50/80/100%
-
 resource "aws_budgets_budget" "monthly_cap" {
   name         = "${var.project_name}-${var.environment}-monthly-cap"
   budget_type  = "COST"

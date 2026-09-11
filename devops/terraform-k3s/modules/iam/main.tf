@@ -25,7 +25,6 @@ resource "aws_iam_role_policy_attachment" "cloudwatch_agent" {
   policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
 }
 
-# ECR pull only
 resource "aws_iam_policy" "ecr_pull" {
   name = "${var.project_name}-ecr-pull-${var.environment}"
   policy = jsonencode({
@@ -75,7 +74,7 @@ resource "aws_iam_instance_profile" "k3s_node" {
 }
 
 # ----------------------------------------------------------------------------
-# EXTERNAL SECRETS OPERATOR ROLE
+# EXTERNAL SECRETS OPERATOR - deliberately NOT via the node's instance profile
 # ----------------------------------------------------------------------------
 
 resource "aws_iam_user" "eso_secrets_reader" {
@@ -86,7 +85,6 @@ resource "aws_iam_access_key" "eso_secrets_reader" {
   user = aws_iam_user.eso_secrets_reader.name
 }
 
-# Scoped to app secrets only
 resource "aws_iam_policy" "eso_secrets_read" {
   name = "${var.project_name}-eso-secrets-read-${var.environment}"
   policy = jsonencode({
@@ -106,7 +104,7 @@ resource "aws_iam_user_policy_attachment" "eso_secrets_reader_attach" {
 }
 
 # ----------------------------------------------------------------------------
-# JENKINS STATIC USER
+# JENKINS - STATIC IAM USER
 # ----------------------------------------------------------------------------
 
 resource "aws_iam_user" "jenkins_static" {
@@ -152,4 +150,40 @@ resource "aws_iam_user_policy_attachment" "jenkins_deploy_attach" {
 resource "aws_iam_user_policy_attachment" "jenkins_ssm" {
   user       = aws_iam_user.jenkins_static.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMReadOnlyAccess"
+}
+
+# ----------------------------------------------------------------------------
+# COSIGN IMAGE SIGNING - KMS-backed key
+# ----------------------------------------------------------------------------
+
+resource "aws_kms_key" "cosign_signing" {
+  description              = "Asymmetric signing key for cosign image signing (Jenkins)"
+  key_usage                = "SIGN_VERIFY"
+  customer_master_key_spec = "ECC_NIST_P256"
+  deletion_window_in_days  = 30
+}
+
+resource "aws_kms_alias" "cosign_signing" {
+  name          = "alias/${var.project_name}-cosign-signing-${var.environment}"
+  target_key_id = aws_kms_key.cosign_signing.key_id
+}
+
+resource "aws_iam_policy" "cosign_sign" {
+  name        = "${var.project_name}-cosign-sign-${var.environment}"
+  description = "Lets Jenkins sign images with the cosign KMS key - nothing else"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid      = "CosignSign"
+      Effect   = "Allow"
+      Action   = ["kms:Sign", "kms:GetPublicKey", "kms:DescribeKey"]
+      Resource = aws_kms_key.cosign_signing.arn
+    }]
+  })
+}
+
+resource "aws_iam_user_policy_attachment" "cosign_sign_attach" {
+  user       = aws_iam_user.jenkins_static.name
+  policy_arn = aws_iam_policy.cosign_sign.arn
 }

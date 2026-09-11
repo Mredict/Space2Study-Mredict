@@ -10,6 +10,16 @@ spec:
       match:
         any:
           - resources: { kinds: ["Pod"] }
+      exclude:
+        any:
+          - resources:
+              namespaces:
+                - kube-system
+                - ingress-nginx
+                - cert-manager
+                - external-secrets
+                - kyverno
+                - argocd
       validate:
         message: "Images must use an explicit, non-'latest' tag (ECR is IMMUTABLE - use the build's unique tag)"
         pattern:

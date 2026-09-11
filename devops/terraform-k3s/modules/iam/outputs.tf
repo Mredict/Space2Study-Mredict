@@ -20,3 +20,8 @@ output "jenkins_secret_access_key" {
   value     = aws_iam_access_key.jenkins_static.secret
   sensitive = true
 }
+
+output "cosign_key_uri" {
+  description = "Paste this EXACTLY as the 'cosign-private-key' Jenkins credential (Secret text kind) - no assembly needed"
+  value       = "awskms:///${aws_kms_key.cosign_signing.arn}"
+}

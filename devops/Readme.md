@@ -3,31 +3,57 @@
 ## Architecture
 
 ```
-                         Elastic IP (node 0, stable across stop/start)
-                                    |
-                    +---------------+---------------+
-                    |               |               |
-              k3s node 0      k3s node 1      k3s node 2      <- t3.small, public
-              (etcd init)     (etcd member)   (etcd member)      subnets, no NAT
-                    |               |               |
-         ingress-nginx (hostNetwork DaemonSet, every node terminates 80/443)
-                    |
-        +-----------+-----------+
-        |                       |
-    frontend (2 pods)      backend (2-6 pods, HPA)
-                                 |
-                    mongodb-0 / -1 / -2 (StatefulSet, one
-                    replica per node, local-path on a
-                    dedicated EBS volume per node, keyfile auth)
+              control-plane (t3.small, tainted NoSchedule -
+              runs k3s server + SQLite only, no workload pods,
+              no HA - single node by design; own Elastic IP
+              for kubectl/API on :6443)
+                        |
+                (private IP, :6443)
+                        |
+        +---------------+---------------+
+        |                               |
+   worker-0 (t3.small)            worker-1 (t3.small)
+   k3s agent, own Elastic IP      k3s agent, own Elastic IP
+        |                               |
+        +---------------+---------------+
+                        |
+         ingress-nginx (hostNetwork DaemonSet - runs on WORKERS
+         only; reach the app at a worker's IP, NOT the
+         control plane's)
+                        |
+        +---------------+---------------+
+        |                               |
+    frontend (2 pods)              backend (2-6 pods, HPA)
+                                        |
+                    mongodb-0 / mongodb-1 (StatefulSet, soft
+                    anti-affinity - prefers one replica per
+                    worker but can co-locate if it must -
+                    local-path on a dedicated EBS volume per
+                    worker, keyfile auth)
 
            (space2study-dev / space2study-prod namespaces - separate)
 
   Cross-cutting: cert-manager (self-signed), external-secrets (AWS Secrets
-  Manager), Kyverno (policy enforcement), NetworkPolicies (default-deny),
-  ResourceQuota/LimitRange, ArgoCD (in-cluster, pulls from git - see "CD:
-  GitOps via ArgoCD" below; Jenkins builds/scans/pushes/signs images and
-  commits the new tag to git, nothing more)
+  Manager), Kyverno (policy enforcement, excludes infra namespaces),
+  NetworkPolicies (default-deny), ResourceQuota/LimitRange, ArgoCD
+  (in-cluster, pulls from git - see "CD: GitOps via ArgoCD" below; Jenkins
+  builds/scans/pushes/signs images and commits the new tag to git, nothing
+  more)
 ```
+
+Control-plane and worker roles are split across separate nodes deliberately
+- not the original design. All 3 nodes originally ran combined k3s
+server+etcd+workloads, and etcd started timing out (`etcdserver: request
+timed out`) under the load of installing ArgoCD (5 Deployments/StatefulSets
+at once) on top of everything already running. Isolating etcd/apiserver
+onto their own dedicated node removes that contention entirely - at the
+cost of losing control-plane HA (a single control-plane is a single point
+of failure for the API server, though workloads on the workers keep running
+uninterrupted if it's briefly down) and reducing MongoDB from 3 replicas to
+2 (a hard anti-affinity StatefulSet can't schedule more replicas than there
+are workers to put them on). Total node/EIP count is unchanged (still 3
+instances, 3 Elastic IPs) - this was a re-allocation of roles, not an
+increase in cost.
 
 No NAT gateway/instance, no AWS load balancer, no EKS control plane, no SSH.
 Node shell access is via SSM Session Manager only.
@@ -63,7 +89,7 @@ free allowance is 30GB total: this design uses 3x (20GB root + 15GB mongo
 data) = 105GB of gp3, so storage draws from your credit regardless of the
 instance-type change.
 
-Everything below assumes **3x t3.small** nodes, eu-central-1, on-demand:
+Everything below assumes **3x t3.small** nodes (1 control-plane + 2 workers), eu-central-1, on-demand - the role split doesn't change the node/EIP count or the cost:
 
 | Item | Running 24/7 | Stopped (study-session pattern) |
 |---|---|---|
@@ -242,7 +268,7 @@ kubectl get nodes                               # should show 3 Ready nodes
 #   kubectl get application dev-space2study -n argocd -w
 
 kubectl -n space2study-dev exec -it mongodb-0 -- mongosh --eval "rs.status()"   # verify replica set
-curl -k https://$(terraform -chdir=terraform-k3s output -raw k3s_api_endpoint)/api/health
+curl -k https://$(terraform -chdir=terraform-k3s output -raw primary_worker_public_ip)/api/health   # a WORKER IP, not k3s_api_endpoint - that's the control plane, which runs no app pods
 
 # End of study session:
 ./scripts/cluster-down.sh space2study dev
@@ -274,6 +300,14 @@ curl -k https://$(terraform -chdir=terraform-k3s output -raw k3s_api_endpoint)/a
   domain, swap `cluster-addons/cert-manager-cluster-issuer.yaml` for a Let's
   Encrypt ACME issuer and set `domain:` in `values.yaml`; nothing else in the
   chart needs to change.
+- **Kyverno policies exclude infra namespaces** (`kube-system`,
+  `ingress-nginx`, `cert-manager`, `external-secrets`, `kyverno`, `argocd`) -
+  added after discovering the hard way that cluster-wide "Enforce" policies
+  also apply to third-party charts' own internal jobs (ingress-nginx's
+  admission-webhook setup job doesn't set explicit `runAsNonRoot`/resource
+  limits, and got blocked on every Helm upgrade, not just first install).
+  The policies still fully enforce against `space2study-dev`/`-prod` -
+  only infra namespaces are exempted.
 - **ArgoCD's `podSecurityContext` keys** in `cluster-addons/argocd-values.yaml`
   are my best attempt at matching the argo-helm chart's actual schema for
   version 10.8.1, added specifically so Kyverno's `require-non-root` policy
@@ -290,6 +324,21 @@ curl -k https://$(terraform -chdir=terraform-k3s output -raw k3s_api_endpoint)/a
   restructuring. `yq` would be the robust fix; not added to `ci_tools` to
   keep this change scoped, but worth doing if you reorganize the values
   files later.
+- **MongoDB dropped from 3 replicas to 2** when the cluster moved to 1
+  control-plane + 2 workers - there's only 2 nodes to put data-bearing
+  replicas on now. Anti-affinity was also softened from hard to soft
+  (`preferredDuringSchedulingIgnoredDuringExecution`) so a StatefulSet
+  scheduling mismatch never hard-fails. A 2-member replica set has weaker
+  failover characteristics than 3 - proper odd-numbered quorum would mean
+  adding a lightweight MongoDB **arbiter** (votes but holds no data) running
+  on the otherwise-idle, tainted control-plane node, which needs an explicit
+  toleration + nodeSelector to land there. Worth doing as a deliberate
+  follow-up; not folded into this change to keep it scoped.
+- **No control-plane HA anymore** - a single control-plane node is a single
+  point of failure for the API server (though the workers keep serving
+  existing traffic uninterrupted if it's briefly down). This was a
+  deliberate trade for resource isolation after etcd started timing out
+  sharing nodes with workloads - see the Architecture section.
 - **Jenkins uses a static IAM access key**, not IAM Roles Anywhere - a
   deliberate fallback after Roles Anywhere was built and verified correct
   end-to-end but hit an unresolved AWS-side certificate rejection (see

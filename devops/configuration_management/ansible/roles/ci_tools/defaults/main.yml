@@ -1,19 +1,7 @@
 ---
-# Every version here is pinned deliberately (matches the "immutable tags,
-# no :latest" theme running through this whole migration) and was checked
-# against each project's actual release page rather than assumed. Bump
-# these on your own schedule, not because a script silently tracked
-# "latest" and changed behavior under you mid-pipeline.
-
 trivy_version: "0.74.0"
 trivy_deb_url: "https://github.com/aquasecurity/trivy/releases/download/v{{ trivy_version }}/trivy_{{ trivy_version }}_Linux-64bit.deb"
 
-# Pinned to the v2.x line deliberately, NOT v3 (current latest). Cosign v3
-# changed the default signature format (the sigstore "bundle" format) and
-# made --bundle required for sign-blob; that's a real behavior change I
-# haven't validated against this pipeline's `cosign sign --key ... --yes
-# <image>` usage or against Kyverno's image-verification expectations.
-# Revisit once you've tested v3 deliberately, not as a silent version bump.
 cosign_version: "2.6.5"
 cosign_bin_url: "https://github.com/sigstore/cosign/releases/download/v{{ cosign_version }}/cosign-linux-amd64"
 
@@ -23,16 +11,8 @@ syft_deb_url: "https://github.com/anchore/syft/releases/download/v{{ syft_versio
 kyverno_cli_version: "1.17.0"
 kyverno_cli_url: "https://github.com/kyverno/kyverno/releases/download/v{{ kyverno_cli_version }}/kyverno-cli_v{{ kyverno_cli_version }}_linux_x86_64.tar.gz"
 
-# Matches terraform-k3s's pinned k3s_version (v1.31.4+k3s1) - kubectl within
-# one minor version of the server is the supported skew.
 kubectl_version: "1.31.4"
 kubectl_url: "https://dl.k8s.io/release/v{{ kubectl_version }}/bin/linux/amd64/kubectl"
 
-# Helm v4 is current stable (Nov 2025+) but is a breaking major version from
-# v3 (new Go template engine internals, OCI-related changes) that this
-# chart/Jenkinsfile has not been validated against. Pinned to the last v3
-# line, which still gets SECURITY fixes only until 2026-11-11 - after that
-# date this needs a deliberate, tested migration to v4, not a version bump
-# done in passing.
 helm_version: "3.21.1"
 helm_tarball_url: "https://get.helm.sh/helm-v{{ helm_version }}-linux-amd64.tar.gz"

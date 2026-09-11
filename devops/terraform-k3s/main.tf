@@ -50,8 +50,8 @@ module "iam" {
     module.ecr.frontend_repository_arn,
     module.ecr.backend_repository_arn,
   ]
-  k3s_token_secret_arn       = module.secrets.k3s_cluster_token_arn
-  app_secrets_arn            = module.secrets.app_secrets_arn
+  k3s_token_secret_arn = module.secrets.k3s_cluster_token_arn
+  app_secrets_arn      = module.secrets.app_secrets_arn
 }
 
 # 6. k3s cluster
@@ -60,8 +60,9 @@ module "k3s_cluster" {
   project_name                = var.project_name
   environment                 = var.environment
   aws_region                  = var.aws_region
-  node_instance_type          = var.node_instance_type
-  node_count                  = var.node_count
+  control_plane_instance_type = var.control_plane_instance_type
+  worker_instance_type        = var.worker_instance_type
+  worker_count                = var.worker_count
   root_volume_gb              = var.root_volume_gb
   mongo_data_volume_gb        = var.mongo_data_volume_gb
   public_subnets              = module.networking.public_subnets
@@ -79,7 +80,7 @@ module "monitoring" {
   node_instance_ids    = module.k3s_cluster.all_node_ids
 }
 
-# 8. Budget guardrail against your $100 ceiling
+# 8. Budget guardrail
 module "budget" {
   source               = "./modules/budget"
   project_name         = var.project_name

@@ -1,3 +1,4 @@
+# SNS -> Lambda -> Discord
 data "archive_file" "discord_notifier_zip" {
   type        = "zip"
   source_file = "${path.module}/lambda/discord_notifier.py"

@@ -6,11 +6,11 @@ image:
 frontend:
   replicas: 2
   image:
-    tag: latest # overwritten by Jenkins's "Update GitOps Manifest" stage on prod builds
+    tag: latest
 backend:
   replicas: 2
   image:
-    tag: latest # overwritten by Jenkins's "Update GitOps Manifest" stage on prod builds
+    tag: latest
 
 mongodb:
   replicas: 3

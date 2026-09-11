@@ -1,19 +1,4 @@
 ---
-# Installs every tool the Jenkinsfile invokes that isn't already covered by
-# common/docker_setup/agent_setup: trivy, cosign, syft, kyverno CLI, helm,
-# kubectl. Without this role every scan/sign/policy/deploy stage in the
-# pipeline fails at "command not found" - these were referenced in the
-# Jenkinsfile but never actually provisioned anywhere.
-#
-# NOTE ON CHECKSUMS: get_url below does not pin a `checksum:` for these
-# downloads because I don't have verified hashes for these specific
-# versions to give you - a wrong-looking-right hash would be worse than
-# none. Recommended follow-up: download each once, verify against the
-# project's published checksum (trivy/syft ship a companion checksums
-# file, cosign's release page lists SHA256 sums), then add `checksum:
-# sha256:<value>` to the matching task so future re-provisions verify
-# automatically.
-
 - name: Check whether trivy is already at the pinned version
   ansible.builtin.command: trivy --version
   register: ci_tools_trivy_check
@@ -80,8 +65,6 @@
         src: "/tmp/kyverno-cli_{{ kyverno_cli_version }}.tar.gz"
         dest: /tmp/kyverno-cli-extract
         remote_src: true
-    # The tarball's internal layout isn't something I could verify without
-    # downloading it, so locate the binary rather than assume a fixed path.
     - ansible.builtin.find:
         paths: /tmp/kyverno-cli-extract
         patterns: "kyverno"

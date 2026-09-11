@@ -1,9 +1,4 @@
-# Idempotent: checks rs.status() first and does nothing if the replica set is
-# already initiated, so this is safe to run on every `helm upgrade`.
-# NOTE: replica-set bootstrap ordering is one of the fiddlier parts of running
-# Mongo yourself - verify with `kubectl exec mongodb-0 -- mongosh --eval "rs.status()"`
-# after the first deploy and adjust the wait loop below if your nodes take
-# longer to become DNS-resolvable than this assumes.
+# Idempotent: checks rs.status() first and does nothing if the replica set is already initiated
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -59,9 +54,9 @@ spec:
                 rs.initiate({
                   _id: "rs0",
                   members: [
-                    { _id: 0, host: "mongodb-0.mongodb-headless.{{ .Values.namespace }}.svc.cluster.local:{{ .Values.mongodb.port }}" },
-                    { _id: 1, host: "mongodb-1.mongodb-headless.{{ .Values.namespace }}.svc.cluster.local:{{ .Values.mongodb.port }}" },
-                    { _id: 2, host: "mongodb-2.mongodb-headless.{{ .Values.namespace }}.svc.cluster.local:{{ .Values.mongodb.port }}" }
+{{- range $i := until (int .Values.mongodb.replicas) }}
+                    { _id: {{ $i }}, host: "mongodb-{{ $i }}.mongodb-headless.{{ $.Values.namespace }}.svc.cluster.local:{{ $.Values.mongodb.port }}" }{{ if lt (add1 $i) (int $.Values.mongodb.replicas) }},{{ end }}
+{{- end }}
                   ]
                 })
               '

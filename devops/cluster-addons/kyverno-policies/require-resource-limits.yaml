@@ -10,6 +10,16 @@ spec:
       match:
         any:
           - resources: { kinds: ["Pod"] }
+      exclude:
+        any:
+          - resources:
+              namespaces:
+                - kube-system
+                - ingress-nginx
+                - cert-manager
+                - external-secrets
+                - kyverno
+                - argocd
       validate:
         message: "Every container must set CPU and memory requests/limits (this is a shared 3-node lab, one runaway pod shouldn't starve everything else)"
         pattern:

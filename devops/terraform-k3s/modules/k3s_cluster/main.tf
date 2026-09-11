@@ -13,22 +13,18 @@ data "aws_ami" "al2023" {
   }
 }
 
-locals {
-  join_count = var.node_count - 1
-}
-
 # ----------------------------------------------------------------------------
-# Node 0: bootstraps the cluster with `k3s server --cluster-init`
+# Control plane
 # ----------------------------------------------------------------------------
 
-resource "aws_eip" "init" {
+resource "aws_eip" "control_plane" {
   domain = "vpc"
-  tags   = { Name = "${var.project_name}-k3s-node-0-eip-${var.environment}" }
+  tags   = { Name = "${var.project_name}-k3s-control-plane-eip-${var.environment}" }
 }
 
-resource "aws_instance" "init" {
+resource "aws_instance" "control_plane" {
   ami                    = data.aws_ami.al2023.id
-  instance_type          = var.node_instance_type
+  instance_type          = var.control_plane_instance_type
   subnet_id              = var.public_subnets[0]
   vpc_security_group_ids = [var.node_sg_id]
   iam_instance_profile   = var.node_instance_profile_name
@@ -42,46 +38,43 @@ resource "aws_instance" "init" {
 
   metadata_options {
     http_endpoint               = "enabled"
-    http_tokens                 = "required" # IMDSv2 only
+    http_tokens                 = "required"
     http_put_response_hop_limit = 1
   }
 
-  user_data = templatefile("${path.module}/templates/bootstrap.sh.tpl", {
-    is_init           = true
-    server_private_ip = ""
-    cluster_public_ip = aws_eip.init.public_ip
+  user_data = templatefile("${path.module}/templates/control-plane-bootstrap.sh.tpl", {
+    cluster_public_ip = aws_eip.control_plane.public_ip
     token_secret_arn  = var.k3s_token_secret_arn
     aws_region        = var.aws_region
     k3s_version       = var.k3s_version
-    mongo_device_name = var.mongo_device_name
   })
 
   tags = {
-    Name = "${var.project_name}-k3s-node-0-${var.environment}"
-    Role = "init"
+    Name = "${var.project_name}-k3s-control-plane-${var.environment}"
+    Role = "control-plane"
   }
 }
 
-resource "aws_eip_association" "init" {
-  instance_id   = aws_instance.init.id
-  allocation_id = aws_eip.init.id
+resource "aws_eip_association" "control_plane" {
+  instance_id   = aws_instance.control_plane.id
+  allocation_id = aws_eip.control_plane.id
 }
 
 # ----------------------------------------------------------------------------
-# Remaining nodes: join the cluster via node 0's PRIVATE ip (stays in-VPC)
+# Workers
 # ----------------------------------------------------------------------------
 
-resource "aws_eip" "join" {
-  count  = local.join_count
+resource "aws_eip" "worker" {
+  count  = var.worker_count
   domain = "vpc"
-  tags   = { Name = "${var.project_name}-k3s-node-${count.index + 1}-eip-${var.environment}" }
+  tags   = { Name = "${var.project_name}-k3s-worker-${count.index}-eip-${var.environment}" }
 }
 
-resource "aws_instance" "join" {
-  count = local.join_count
+resource "aws_instance" "worker" {
+  count = var.worker_count
 
   ami                    = data.aws_ami.al2023.id
-  instance_type          = var.node_instance_type
+  instance_type          = var.worker_instance_type
   subnet_id              = var.public_subnets[(count.index + 1) % length(var.public_subnets)]
   vpc_security_group_ids = [var.node_sg_id]
   iam_instance_profile   = var.node_instance_profile_name
@@ -99,47 +92,43 @@ resource "aws_instance" "join" {
     http_put_response_hop_limit = 1
   }
 
-  user_data = templatefile("${path.module}/templates/bootstrap.sh.tpl", {
-    is_init           = false
-    server_private_ip = aws_instance.init.private_ip
-    cluster_public_ip = aws_eip.init.public_ip
-    token_secret_arn  = var.k3s_token_secret_arn
-    aws_region        = var.aws_region
-    k3s_version       = var.k3s_version
-    mongo_device_name = var.mongo_device_name
+  user_data = templatefile("${path.module}/templates/worker-bootstrap.sh.tpl", {
+    control_plane_private_ip = aws_instance.control_plane.private_ip
+    token_secret_arn         = var.k3s_token_secret_arn
+    aws_region               = var.aws_region
+    mongo_device_name        = var.mongo_device_name
   })
 
   tags = {
-    Name = "${var.project_name}-k3s-node-${count.index + 1}-${var.environment}"
-    Role = "join"
+    Name = "${var.project_name}-k3s-worker-${count.index}-${var.environment}"
+    Role = "worker"
   }
 
-  # Make sure the init node is fully up before joiners try to reach it.
-  depends_on = [aws_instance.init]
+  depends_on = [aws_instance.control_plane]
 }
 
-resource "aws_eip_association" "join" {
-  count         = local.join_count
-  instance_id   = aws_instance.join[count.index].id
-  allocation_id = aws_eip.join[count.index].id
+resource "aws_eip_association" "worker" {
+  count         = var.worker_count
+  instance_id   = aws_instance.worker[count.index].id
+  allocation_id = aws_eip.worker[count.index].id
 }
 
 # ----------------------------------------------------------------------------
-# Per-node EBS volume for MongoDB's data directory (local-path storage)
+# Mongo data volume - workers only
 # ----------------------------------------------------------------------------
 
 resource "aws_ebs_volume" "mongo_data" {
-  count             = var.node_count
-  availability_zone = count.index == 0 ? aws_instance.init.availability_zone : aws_instance.join[count.index - 1].availability_zone
+  count             = var.worker_count
+  availability_zone = aws_instance.worker[count.index].availability_zone
   size              = var.mongo_data_volume_gb
   type              = "gp3"
   encrypted         = true
-  tags              = { Name = "${var.project_name}-mongo-data-${count.index}-${var.environment}" }
+  tags              = { Name = "${var.project_name}-mongo-data-worker-${count.index}-${var.environment}" }
 }
 
 resource "aws_volume_attachment" "mongo_data" {
-  count       = var.node_count
+  count       = var.worker_count
   device_name = var.mongo_device_name
   volume_id   = aws_ebs_volume.mongo_data[count.index].id
-  instance_id = count.index == 0 ? aws_instance.init.id : aws_instance.join[count.index - 1].id
+  instance_id = aws_instance.worker[count.index].id
 }

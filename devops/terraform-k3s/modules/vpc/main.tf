@@ -1,4 +1,5 @@
 # Public-subnet-only VPC
+
 module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
   version = "6.7.0"
@@ -20,7 +21,7 @@ module "vpc" {
   flow_log_cloudwatch_log_group_retention_in_days = 14
 }
 
-# Gateway VPC free endpoints for S3/ECR
+# Gateway free VPC endpoints for S3/ECR
 resource "aws_vpc_endpoint" "s3" {
   vpc_id            = module.vpc.vpc_id
   service_name      = "com.amazonaws.${var.aws_region}.s3"

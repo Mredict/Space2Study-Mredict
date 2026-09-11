@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
 # Pulls /etc/rancher/k3s/k3s.yaml off the init node via SSM Session Manager
-# (no SSH key, no open port 22) and rewrites the server URL from
-# 127.0.0.1 to the node's public Elastic IP so kubectl works from your laptop.
-#
 # Usage: ./get-kubeconfig.sh <project_name> <environment>
 set -euo pipefail
 
@@ -10,11 +7,11 @@ PROJECT="${1:-space2study}"
 ENV="${2:-dev}"
 
 INIT_ID=$(aws ec2 describe-instances \
-  --filters "Name=tag:Name,Values=${PROJECT}-k3s-node-0-${ENV}" "Name=instance-state-name,Values=running" \
+  --filters "Name=tag:Name,Values=${PROJECT}-k3s-control-plane-${ENV}" "Name=instance-state-name,Values=running" \
   --query "Reservations[0].Instances[0].InstanceId" --output text)
 
 if [ -z "$INIT_ID" ] || [ "$INIT_ID" = "None" ]; then
-  echo "No running node-0 instance found matching ${PROJECT}-k3s-node-0-${ENV}." >&2
+  echo "No running control-plane instance found matching ${PROJECT}-k3s-control-plane-${ENV}." >&2
   echo "Check the tag name/region, or that terraform apply actually finished." >&2
   exit 1
 fi
