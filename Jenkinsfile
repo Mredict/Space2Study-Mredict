@@ -217,7 +217,7 @@ pipeline {
                         git config user.email "jenkins-ci@space2study.local"
                         git add "\$VALUES_FILE"
                         git commit -m "deploy(${params.ENV}): ${IMAGE_TAG}" || echo "nothing to commit"
-                        git push "https://\${GIT_USER}:\${GIT_TOKEN}@github.com/Mredict/Space2Study-Mredict.git" origin ${params.BRANCH}
+                        git push "https://\${GIT_USER}:\${GIT_TOKEN}@github.com/Mredict/Space2Study-Mredict.git" "${params.BRANCH}"
                     """
                 }
             }
