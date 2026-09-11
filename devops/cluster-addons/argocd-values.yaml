@@ -1,20 +1,19 @@
 # helm install argocd argo/argo-cd -n argocd --create-namespace \
 #   --version 10.8.1 -f cluster-addons/argocd-values.yaml
 
-
 dex:
-  enabled: false # no SSO needed - built-in admin login is enough for a lab
+  enabled: false
 
 notifications:
-  enabled: false # no Slack/webhook notification integrations configured
+  enabled: false
 
 applicationSet:
-  enabled: false # not using ApplicationSets/generators, just 2 static Applications
+  enabled: false
 
 controller:
   resources:
-    requests: { cpu: 50m, memory: 128Mi }
-    limits: { cpu: 250m, memory: 384Mi }
+    requests: { cpu: 50m, memory: 256Mi }
+    limits: { cpu: 250m, memory: 768Mi }
   podSecurityContext:
     runAsNonRoot: true
 
