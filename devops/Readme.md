@@ -3,7 +3,7 @@
 ## Architecture
 
 ```
-              control-plane (t3.small, tainted NoSchedule -
+              control-plane (c7i-flex.large, tainted NoSchedule -
               runs k3s server + SQLite only, no workload pods,
               no HA - single node by design; own Elastic IP
               for kubectl/API on :6443)
@@ -40,20 +40,6 @@
   builds/scans/pushes/signs images and commits the new tag to git, nothing
   more)
 ```
-
-Control-plane and worker roles are split across separate nodes deliberately
-- not the original design. All 3 nodes originally ran combined k3s
-server+etcd+workloads, and etcd started timing out (`etcdserver: request
-timed out`) under the load of installing ArgoCD (5 Deployments/StatefulSets
-at once) on top of everything already running. Isolating etcd/apiserver
-onto their own dedicated node removes that contention entirely - at the
-cost of losing control-plane HA (a single control-plane is a single point
-of failure for the API server, though workloads on the workers keep running
-uninterrupted if it's briefly down) and reducing MongoDB from 3 replicas to
-2 (a hard anti-affinity StatefulSet can't schedule more replicas than there
-are workers to put them on). Total node/EIP count is unchanged (still 3
-instances, 3 Elastic IPs) - this was a re-allocation of roles, not an
-increase in cost.
 
 No NAT gateway/instance, no AWS load balancer, no EKS control plane, no SSH.
 Node shell access is via SSM Session Manager only.

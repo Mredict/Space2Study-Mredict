@@ -69,6 +69,7 @@ module "k3s_cluster" {
   node_sg_id                  = module.security_groups.k3s_node_sg_id
   node_instance_profile_name  = module.iam.k3s_node_instance_profile_name
   k3s_token_secret_arn        = module.secrets.k3s_cluster_token_arn
+  k3s_version                 = var.k3s_version
 }
 
 # 7. Monitoring

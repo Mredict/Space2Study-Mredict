@@ -66,6 +66,11 @@ variable "discord_webhook_url" {
   sensitive = true
 }
 
+variable "k3s_version" {
+  description = "Version of k3s to install"
+  type        = string
+  default     = "v1.30.6+k3s1"
+}
 # ---- Application secrets ----
 
 variable "db_username" {

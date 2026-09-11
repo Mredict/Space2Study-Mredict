@@ -54,8 +54,6 @@ mongodb:
     limits: { cpu: 500m, memory: 768Mi }
 
 externalSecrets:
-  # Populated per-environment with the actual Secrets Manager ARN/region -
-  # see values-dev.yaml.
   region: eu-central-1
   appSecretsName: space2study-app-secrets-dev
 
@@ -67,7 +65,7 @@ networkPolicy:
   enabled: true
 
 podDisruptionBudget:
-  minAvailable: 1
+  maxUnavailable: 1
 
 resourceQuota:
   enabled: true

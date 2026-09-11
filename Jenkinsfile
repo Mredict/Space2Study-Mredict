@@ -7,7 +7,7 @@ pipeline {
     }
 
     parameters {
-        string(name: 'BRANCH', defaultValue: 'main', description: 'Git target branch')
+        string(name: 'BRANCH', defaultValue: 'k8s', description: 'Git target branch')
         choice(name: 'ENV', choices: ['dev', 'prod'], description: 'Deployment Target Environment')
         string(name: 'AWS_REGION', defaultValue: 'eu-central-1', description: 'AWS Target Region')
         string(name: 'AWS_ACCOUNT_ID', defaultValue: '456631682423', description: 'AWS Account ID')
@@ -70,7 +70,7 @@ pipeline {
                               --set frontend.image.tag=${IMAGE_TAG} \
                               > /tmp/rendered-manifests.yaml
 
-                            kyverno apply cluster-addons/kyverno-policies/ \
+                            kyverno apply devops/cluster-addons/kyverno-policies/ \
                               --resource /tmp/rendered-manifests.yaml \
                               --detailed-results
                         '''
@@ -202,7 +202,7 @@ pipeline {
 
         stage('Update GitOps Manifest') {
             steps {
-withCredentials([usernamePassword(
+                withCredentials([usernamePassword(
                     credentialsId: 'jenkins-git-push-creds',
                     usernameVariable: 'GIT_USER',
                     passwordVariable: 'GIT_TOKEN'

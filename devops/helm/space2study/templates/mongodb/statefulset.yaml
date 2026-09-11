@@ -32,11 +32,10 @@ spec:
       containers:
         - name: mongodb
           image: mongo:7.0.14
-          command:
+          args:
             - mongod
             - --replSet=rs0
             - --bind_ip_all
-            - --auth
             - --keyFile=/etc/mongo-keyfile-secure/keyfile
           ports:
             - containerPort: {{ .Values.mongodb.port }}

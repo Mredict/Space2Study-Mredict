@@ -42,6 +42,10 @@ resource "aws_instance" "control_plane" {
     http_put_response_hop_limit = 1
   }
 
+  lifecycle {
+    ignore_changes = [ami, user_data]
+  }
+
   user_data = templatefile("${path.module}/templates/control-plane-bootstrap.sh.tpl", {
     cluster_public_ip = aws_eip.control_plane.public_ip
     token_secret_arn  = var.k3s_token_secret_arn
@@ -91,12 +95,17 @@ resource "aws_instance" "worker" {
     http_tokens                 = "required"
     http_put_response_hop_limit = 1
   }
+  
+  lifecycle {
+    ignore_changes = [ami, user_data]
+  }
 
   user_data = templatefile("${path.module}/templates/worker-bootstrap.sh.tpl", {
     control_plane_private_ip = aws_instance.control_plane.private_ip
     token_secret_arn         = var.k3s_token_secret_arn
     aws_region               = var.aws_region
     mongo_device_name        = var.mongo_device_name
+    k3s_version              = var.k3s_version
   })
 
   tags = {

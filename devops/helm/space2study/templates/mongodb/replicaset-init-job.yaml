@@ -10,6 +10,8 @@ metadata:
 spec:
   backoffLimit: 6
   template:
+    metadata:
+      labels: { app: mongodb-rs-init }
     spec:
       restartPolicy: OnFailure
       securityContext:
@@ -26,6 +28,9 @@ spec:
             runAsNonRoot: true
             readOnlyRootFilesystem: true
             capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: 200m, memory: 128Mi }
           env:
             - name: MONGO_INITDB_ROOT_USERNAME
               valueFrom:
@@ -38,20 +43,19 @@ spec:
             - |
               set -e
               HOST0="mongodb-0.mongodb-headless.{{ .Values.namespace }}.svc.cluster.local:{{ .Values.mongodb.port }}"
+              AUTH_ARGS="-u $MONGO_INITDB_ROOT_USERNAME -p $MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin"
 
-              # Wait for mongodb-0 to accept connections at all (no auth needed
-              # yet - it's a bare, un-initiated replica set member).
-              until mongosh --host "$HOST0" --quiet --eval "db.adminCommand('ping')" >/dev/null 2>&1; do
+              until mongosh --host "$HOST0" $AUTH_ARGS --quiet --eval "db.adminCommand('ping')" >/dev/null 2>&1; do
                 echo "waiting for mongodb-0..."; sleep 5
               done
 
-              ALREADY_INIT=$(mongosh --host "$HOST0" --quiet --eval "try { rs.status(); print('yes') } catch(e) { print('no') }")
+              ALREADY_INIT=$(mongosh --host "$HOST0" $AUTH_ARGS --quiet --eval "try { rs.status(); print('yes') } catch(e) { print('no') }")
               if [ "$ALREADY_INIT" = "yes" ]; then
                 echo "replica set already initiated, nothing to do"
                 exit 0
               fi
 
-              mongosh --host "$HOST0" --quiet --eval '
+              mongosh --host "$HOST0" $AUTH_ARGS --quiet --eval '
                 rs.initiate({
                   _id: "rs0",
                   members: [

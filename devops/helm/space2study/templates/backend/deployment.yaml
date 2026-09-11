@@ -5,7 +5,9 @@ metadata:
   namespace: {{ .Values.namespace }}
   labels: { app: backend }
 spec:
+  {{- if not .Values.backend.autoscaling.enabled }}
   replicas: {{ .Values.backend.replicas }}
+  {{- end }}
   selector:
     matchLabels: { app: backend }
   template:
@@ -45,7 +47,7 @@ spec:
               value: {{ $v | quote }}
             {{- end }}
             - name: MONGODB_URL
-              value: "mongodb://$(DB_USERNAME):$(DB_PASSWORD)@mongodb-0.mongodb-headless.{{ .Values.namespace }}.svc.cluster.local:{{ .Values.mongodb.port }},mongodb-1.mongodb-headless.{{ .Values.namespace }}.svc.cluster.local:{{ .Values.mongodb.port }},mongodb-2.mongodb-headless.{{ .Values.namespace }}.svc.cluster.local:{{ .Values.mongodb.port }}/space2study?replicaSet=rs0&authSource=admin"
+              value: "mongodb://$(DB_USERNAME):$(DB_PASSWORD)@{{ range $i := until (int .Values.mongodb.replicas) }}{{ if $i }},{{ end }}mongodb-{{ $i }}.mongodb-headless.{{ $.Values.namespace }}.svc.cluster.local:{{ $.Values.mongodb.port }}{{ end }}/space2study?replicaSet=rs0&authSource=admin"
           envFrom:
             - secretRef: { name: backend-app-secrets }
           volumeMounts:

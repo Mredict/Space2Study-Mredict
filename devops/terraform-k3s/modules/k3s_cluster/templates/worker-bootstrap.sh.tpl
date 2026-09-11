@@ -31,7 +31,8 @@ if ! blkid "$REAL_DEVICE" >/dev/null 2>&1; then
   mkfs.ext4 -F "$REAL_DEVICE"
 fi
 mount "$REAL_DEVICE" "$MOUNT_POINT" || true
-echo "$REAL_DEVICE $MOUNT_POINT ext4 defaults,nofail 0 2" >> /etc/fstab
+UUID=$(blkid -s UUID -o value "$REAL_DEVICE")
+echo "UUID=$UUID $MOUNT_POINT ext4 defaults,nofail 0 2" >> /etc/fstab
 mkdir -p "$MOUNT_POINT/local-path-provisioner"
 
 # ----------------------------------------------------------------------------
@@ -62,7 +63,26 @@ systemctl enable --now imds-pod-block.service || {
 }
 
 # ----------------------------------------------------------------------------
-# 2. Fetch the cluster join token from Secrets Manager
+# 2. Install the ECR credential provider for k3s
+# ----------------------------------------------------------------------------
+mkdir -p /var/lib/rancher/credentialprovider/bin
+curl -fsSL -o /var/lib/rancher/credentialprovider/bin/ecr-credential-provider \
+  https://artifacts.k8s.io/binaries/cloud-provider-aws/v1.29.0/linux/amd64/ecr-credential-provider-linux-amd64
+chmod 0755 /var/lib/rancher/credentialprovider/bin/ecr-credential-provider
+
+cat >/var/lib/rancher/credentialprovider/config.yaml <<'EOF'
+apiVersion: kubelet.config.k8s.io/v1
+kind: CredentialProviderConfig
+providers:
+  - name: ecr-credential-provider
+    matchImages:
+      - "*.dkr.ecr.*.amazonaws.com"
+    defaultCacheDuration: "12h"
+    apiVersion: credentialprovider.kubelet.k8s.io/v1
+EOF
+
+# ----------------------------------------------------------------------------
+# 3. Fetch the cluster join token from Secrets Manager
 # ----------------------------------------------------------------------------
 K3S_TOKEN=$(aws secretsmanager get-secret-value \
   --region "${aws_region}" \
@@ -70,9 +90,10 @@ K3S_TOKEN=$(aws secretsmanager get-secret-value \
   --query SecretString --output text)
 
 # ----------------------------------------------------------------------------
-# 3. Install k3s AGENT - kubelet + containerd only
+# 4. Install k3s AGENT - kubelet + containerd only
 # ----------------------------------------------------------------------------
 curl -sfL https://get.k3s.io | \
+  INSTALL_K3S_VERSION="${k3s_version}" \
   K3S_URL="https://${control_plane_private_ip}:6443" \
   K3S_TOKEN="$K3S_TOKEN" \
   sh -

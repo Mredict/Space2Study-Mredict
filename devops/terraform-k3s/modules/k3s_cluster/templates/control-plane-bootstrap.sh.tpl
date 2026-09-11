@@ -14,7 +14,7 @@ cat >/etc/k3s/audit-policy.yaml <<'AUDIT'
 apiVersion: audit.k8s.io/v1
 kind: Policy
 rules:
-  - level: RequestResponse
+  - level: Metadata
     resources:
       - group: ""
         resources: ["secrets", "configmaps"]

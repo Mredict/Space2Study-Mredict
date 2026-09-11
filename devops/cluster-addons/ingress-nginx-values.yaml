@@ -3,10 +3,9 @@
 
 controller:
   kind: DaemonSet
-  hostNetwork: true
+  hostNetwork: false
   hostPort:
     enabled: true
-  dnsPolicy: ClusterFirstWithHostNet
   service:
     enabled: false
   admissionWebhooks:
