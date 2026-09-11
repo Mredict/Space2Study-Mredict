@@ -79,20 +79,23 @@ pipeline {
             }
         }
 
-        stage('SonarQube & Strict Quality Gate') {
+        stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('SonarQube') {
                     sh "${tool 'SonarScanner'}/bin/sonar-scanner \
-                        -Dsonar.projectKey=space2study \
-                        -Dsonar.sources=backend,frontend \
-                        -Dsonar.exclusions=**/node_modules/**,**/coverage/**"
-                }
-                timeout(time: 5, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: false
+                        -Dsonar.nodejs.executable=/usr/bin/node \
+                        -Dsonar.javascript.node.maxspace=2048"
                 }
             }
         }
 
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 10, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
         stage('SCA Dependency Vulnerabilities (Snyk)') {
             environment {
                 SNYK_TOKEN = credentials('snyk-token')
