@@ -6,7 +6,7 @@ image:
 frontend:
   replicas: 1
   image:
-    tag: 219-ffe9dcc
+    tag: 220-2c233dc
   autoscaling:
     minReplicas: 1
     maxReplicas: 2
@@ -14,7 +14,7 @@ frontend:
 backend:
   replicas: 1
   image:
-    tag: 219-ffe9dcc
+    tag: 220-2c233dc
   autoscaling:
     minReplicas: 1
     maxReplicas: 3
