@@ -202,13 +202,17 @@ pipeline {
 
         stage('Update GitOps Manifest') {
             steps {
-                withCredentials([usernamePassword(
+withCredentials([usernamePassword(
                     credentialsId: 'jenkins-git-push-creds',
                     usernameVariable: 'GIT_USER',
                     passwordVariable: 'GIT_TOKEN'
                 )]) {
                     sh """
                         VALUES_FILE="devops/helm/space2study/values-${params.ENV}.yaml"
+                        REMOTE_URL="https://\${GIT_USER}:\${GIT_TOKEN}@github.com/Mredict/Space2Study-Mredict.git"
+
+                        git fetch "\$REMOTE_URL" "${params.BRANCH}"
+                        git checkout -B "${params.BRANCH}" FETCH_HEAD
 
                         sed -i "/^frontend:/,/^[a-z]/ s|tag: .*|tag: ${IMAGE_TAG}|" "\$VALUES_FILE"
                         sed -i "/^backend:/,/^[a-z]/ s|tag: .*|tag: ${IMAGE_TAG}|" "\$VALUES_FILE"
@@ -217,7 +221,7 @@ pipeline {
                         git config user.email "jenkins-ci@space2study.local"
                         git add "\$VALUES_FILE"
                         git commit -m "deploy(${params.ENV}): ${IMAGE_TAG}" || echo "nothing to commit"
-                        git push "https://\${GIT_USER}:\${GIT_TOKEN}@github.com/Mredict/Space2Study-Mredict.git" "${params.BRANCH}"
+                        git push "\$REMOTE_URL" "${params.BRANCH}:${params.BRANCH}"
                     """
                 }
             }
