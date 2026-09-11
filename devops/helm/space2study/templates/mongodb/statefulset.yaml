@@ -37,7 +37,7 @@ spec:
             - --replSet=rs0
             - --bind_ip_all
             - --auth
-            - --keyFile=/etc/mongo-keyfile/keyfile
+            - --keyFile=/etc/mongo-keyfile-secure/keyfile
           ports:
             - containerPort: {{ .Values.mongodb.port }}
           securityContext:
@@ -58,8 +58,8 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /data/db
-            - name: keyfile
-              mountPath: /etc/mongo-keyfile
+            - name: keyfile-secure
+              mountPath: /etc/mongo-keyfile-secure
               readOnly: true
             - name: tmp
               mountPath: /tmp
@@ -73,6 +73,26 @@ spec:
               command: ["mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
             initialDelaySeconds: 30
             periodSeconds: 20
+      initContainers:
+        - name: fix-keyfile-perms
+          image: mongo:7.0.14
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              cp /etc/mongo-keyfile/keyfile /etc/mongo-keyfile-secure/keyfile
+              chmod 600 /etc/mongo-keyfile-secure/keyfile
+          volumeMounts:
+            - name: keyfile
+              mountPath: /etc/mongo-keyfile
+              readOnly: true
+            - name: keyfile-secure
+              mountPath: /etc/mongo-keyfile-secure
       volumes:
         - name: keyfile
           secret:
@@ -80,6 +100,8 @@ spec:
             defaultMode: 0400
             items:
               - { key: keyfile, path: keyfile }
+        - name: keyfile-secure
+          emptyDir: {}
         - name: tmp
           emptyDir: {}
   volumeClaimTemplates:
