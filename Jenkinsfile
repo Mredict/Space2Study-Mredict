@@ -174,7 +174,7 @@ pipeline {
         stage('ECR Push & Sign') {
             steps {
                 withCredentials([usernamePassword(
-                    credentialsId: 'jenkins-aws-static-creds',
+                    credentialsId: 'aws-jenkins-deployer',
                     usernameVariable: 'AWS_ACCESS_KEY_ID',
                     passwordVariable: 'AWS_SECRET_ACCESS_KEY'
                 )]) {
@@ -188,7 +188,7 @@ pipeline {
                 }
                 //Image signing
                 withCredentials([usernamePassword(
-                    credentialsId: 'jenkins-aws-static-creds',
+                    credentialsId: 'aws-jenkins-deployer',
                     usernameVariable: 'AWS_ACCESS_KEY_ID',
                     passwordVariable: 'AWS_SECRET_ACCESS_KEY'
                 )]) {
