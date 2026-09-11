@@ -83,9 +83,8 @@ pipeline {
             steps {
                 withSonarQubeEnv('SonarQube') {
                     sh "${tool 'SonarScanner'}/bin/sonar-scanner \
-                        -Dsonar.projectKey=space2study \
-                        -Dsonar.sources=backend,frontend \
-                        -Dsonar.exclusions=**/node_modules/**,**/coverage/**"
+                        -Dsonar.nodejs.executable=/usr/bin/node \
+                        -Dsonar.javascript.node.maxspace=2048"
                 }
                 timeout(time: 5, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: false
