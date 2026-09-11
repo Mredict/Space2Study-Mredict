@@ -1,7 +1,7 @@
 namespace: space2study-dev
 
 image:
-  registry: "<AWS_ACCOUNT_ID>.dkr.ecr.eu-central-1.amazonaws.com"
+  registry: "456631682423.dkr.ecr.eu-central-1.amazonaws.com"
 
 frontend:
   replicas: 1
