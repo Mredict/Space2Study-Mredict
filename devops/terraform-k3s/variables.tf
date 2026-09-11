@@ -23,7 +23,7 @@ variable "control_plane_instance_type" {
   description = "Instance type for the control plane node"
 
   type    = string
-  default = "t3.small"
+  default = "c7i-flex.large"
 }
 
 variable "worker_instance_type" {

@@ -19,11 +19,6 @@ fi
 PUBLIC_IP=$(aws ec2 describe-instances --instance-ids "$INIT_ID" \
   --query "Reservations[0].Instances[0].PublicIpAddress" --output text)
 
-# SSM Agent takes a minute or two to register after a fresh boot - a
-# freshly-terraform-applied node hasn't necessarily finished that yet, and
-# `send-command` against an unregistered instance fails with
-# InvalidInstanceId ("not in a valid state"), which reads like a permissions
-# problem but usually just means "give it a minute."
 echo "Waiting for SSM Agent on $INIT_ID to register (can take 1-2 min after boot)..."
 SSM_WAIT_SECS=0
 until [ "$(aws ssm describe-instance-information \
@@ -40,9 +35,6 @@ until [ "$(aws ssm describe-instance-information \
 done
 echo "SSM Agent online."
 
-# k3s itself can still be mid-install even once SSM is reachable (the
-# bootstrap script downloads and installs k3s after SSM is already up), so
-# retry the actual file read a few times before giving up.
 echo "Fetching /etc/rancher/k3s/k3s.yaml (retrying if k3s is still installing)..."
 ATTEMPT=0
 CONTENT=""
