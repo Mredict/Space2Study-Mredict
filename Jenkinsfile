@@ -95,7 +95,7 @@ pipeline {
 
         stage('SCA Dependency Vulnerabilities (Snyk)') {
             environment {
-                SNYK_TOKEN = credentials('snyk-api-token')
+                SNYK_TOKEN = credentials('snyk-token')
             }
             parallel {
                 stage('Audit Backend Dependencies') {
