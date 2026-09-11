@@ -15,15 +15,8 @@ spec:
     spec:
       serviceAccountName: mongodb
       automountServiceAccountToken: false
-      # Prefer spreading across workers when possible (see the soft
-      # anti-affinity below) - with only 2 workers, at most 2 replicas can
-      # ever be on genuinely separate nodes regardless of total replica count.
       affinity:
         podAntiAffinity:
-          # Soft, not hard: with only 2 workers, a hard requirement here
-          # would make the 3rd/Nth replica permanently unschedulable the
-          # moment replicas exceeds worker_count. Prefer spreading across
-          # nodes when possible, but don't block scheduling if it can't.
           preferredDuringSchedulingIgnoredDuringExecution:
             - weight: 100
               podAffinityTerm:
@@ -82,14 +75,7 @@ spec:
             initialDelaySeconds: 30
             periodSeconds: 20
             timeoutSeconds: 10
-      # Kubernetes' fsGroup mechanism grants group-read on every file in a
-      # Secret volume regardless of defaultMode - a well-known gotcha that
-      # makes it impossible to get true owner-only permissions on a
-      # Secret-mounted file directly. MongoDB's keyFile check requires
-      # exactly that (owner read/write only, zero group/other access), so
-      # this copies the key out of the Secret mount into a plain writable
-      # emptyDir and chmods the COPY, which isn't subject to the same
-      # Secret-volume permission overlay.
+
       initContainers:
         - name: fix-keyfile-perms
           image: mongo:7.0.14
