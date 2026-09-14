@@ -50,8 +50,6 @@ See `sonar-project.properties` and `Jenkinsfile` at the root of this branch for 
 └── sonar-project.properties
 ```
 
-For the full annotated file tree, see [`DEVSECOPS_FILE_TREE.md`](./DEVSECOPS_FILE_TREE.md).
-
 ## 🚦 Getting Started
 
 Pick the branch matching what you want to explore or deploy, then follow that branch's README:
