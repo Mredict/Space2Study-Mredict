@@ -59,7 +59,3 @@ git checkout local   # Vagrant + Ansible on VirtualBox
 git checkout cloud   # Terraform on AWS
 git checkout k8s     # Self-managed k3s + GitOps
 ```
-
-## 📄 License
-
-_Add your license here._
