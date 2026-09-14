@@ -11,6 +11,8 @@ terraform.tfvars
 *.tfvars
 *.tfvars.json
 .terraform/
+kubeconfig-dev.yaml
+kubeconfig-prod.yaml
 
 *.tfplan
 plan.txt
