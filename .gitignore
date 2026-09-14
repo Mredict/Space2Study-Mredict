@@ -10,6 +10,7 @@ terraform.tfvars
 .terraform.lock.hcl
 *.tfvars
 *.tfvars.json
+kubeconfig-*.yaml
 
 *.tfplan
 plan.txt
