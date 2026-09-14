@@ -11,7 +11,6 @@ Space2Study is a full-stack study-matching platform (React/Vite frontend, Node.j
 | [`local`](../../tree/local) | Local infrastructure | Vagrant + Ansible provisioning three VMs (with and without Docker), manual IaC, container hardening |
 | [`cloud`](../../tree/cloud) | Cloud infrastructure | Terraform-provisioned AWS resources, ECR, Jenkins-driven deployment |
 | [`k8s`](../../tree/k8s) | Kubernetes / GitOps | Self-managed k3s on EC2, Helm, ArgoCD, Kyverno policy enforcement, External Secrets Operator |
-| `main` | Application source | Frontend, backend, and shared devops tooling used across all stages |
 
 Each branch README covers: architecture and topology, prerequisites, and step-by-step deployment for that stage.
 
