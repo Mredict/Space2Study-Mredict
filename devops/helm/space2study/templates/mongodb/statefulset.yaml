@@ -1,0 +1,117 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongodb
+  namespace: {{ .Values.namespace }}
+  labels: { app: mongodb }
+spec:
+  serviceName: mongodb-headless
+  replicas: {{ .Values.mongodb.replicas }}
+  selector:
+    matchLabels: { app: mongodb }
+  template:
+    metadata:
+      labels: { app: mongodb }
+    spec:
+      serviceAccountName: mongodb
+      automountServiceAccountToken: false
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels: { app: mongodb }
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: mongodb
+          image: mongo:7.0.14
+          args:
+            - mongod
+            - --replSet=rs0
+            - --bind_ip_all
+            - --keyFile=/etc/mongo-keyfile-secure/keyfile
+          ports:
+            - containerPort: {{ .Values.mongodb.port }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            {{- toYaml .Values.mongodb.resources | nindent 12 }}
+          env:
+            - name: MONGO_INITDB_ROOT_USERNAME
+              valueFrom:
+                secretKeyRef: { name: mongodb-credentials, key: MONGO_INITDB_ROOT_USERNAME }
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: mongodb-credentials, key: MONGO_INITDB_ROOT_PASSWORD }
+          volumeMounts:
+            - name: data
+              mountPath: /data/db
+            - name: keyfile-secure
+              mountPath: /etc/mongo-keyfile-secure
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+          readinessProbe:
+            exec:
+              command: ["mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 10
+
+      initContainers:
+        - name: fix-keyfile-perms
+          image: mongo:7.0.14
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              cp /etc/mongo-keyfile/keyfile /etc/mongo-keyfile-secure/keyfile
+              chmod 600 /etc/mongo-keyfile-secure/keyfile
+          volumeMounts:
+            - name: keyfile
+              mountPath: /etc/mongo-keyfile
+              readOnly: true
+            - name: keyfile-secure
+              mountPath: /etc/mongo-keyfile-secure
+      volumes:
+        - name: keyfile
+          secret:
+            secretName: mongodb-credentials
+            defaultMode: 0400
+            items:
+              - { key: keyfile, path: keyfile }
+        - name: keyfile-secure
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: {{ .Values.mongodb.storageClassName }}
+        resources:
+          requests:
+            storage: {{ .Values.mongodb.storageSize }}

@@ -1,0 +1,36 @@
+namespace: space2study-dev
+
+domain: "18.195.40.71.nip.io"
+
+image:
+  registry: "456631682423.dkr.ecr.eu-central-1.amazonaws.com"
+
+frontend:
+  replicas: 1
+  image:
+    tag: 223-2e7486d
+  autoscaling:
+    minReplicas: 1
+    maxReplicas: 2
+
+backend:
+  replicas: 1
+  image:
+    tag: 223-2e7486d
+  autoscaling:
+    minReplicas: 1
+    maxReplicas: 3
+  env:
+    SERVER_URL: "https://18.195.40.71.nip.io"
+    CLIENT_URL: "https://18.195.40.71.nip.io"
+    COOKIE_DOMAIN: "18.195.40.71.nip.io"
+
+mongodb:
+  replicas: 2
+
+externalSecrets:
+  appSecretsName: space2study-app-secrets-dev
+
+resourceQuota:
+  cpu: "3"
+  memory: 4Gi

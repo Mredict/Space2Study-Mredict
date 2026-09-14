@@ -1,0 +1,27 @@
+{{- if .Values.resourceQuota.enabled }}
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: space2study-quota
+  namespace: {{ .Values.namespace }}
+spec:
+  hard:
+    requests.cpu: {{ .Values.resourceQuota.cpu | quote }}
+    requests.memory: {{ .Values.resourceQuota.memory | quote }}
+    pods: {{ .Values.resourceQuota.pods | quote }}
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: space2study-limits
+  namespace: {{ .Values.namespace }}
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: 250m
+        memory: 256Mi
+      defaultRequest:
+        cpu: 50m
+        memory: 64Mi
+{{- end }}

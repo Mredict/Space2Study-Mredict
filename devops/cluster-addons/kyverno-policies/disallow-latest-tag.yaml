@@ -1,0 +1,28 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-latest-tag
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: require-image-tag
+      match:
+        any:
+          - resources: { kinds: ["Pod"] }
+      exclude:
+        any:
+          - resources:
+              namespaces:
+                - kube-system
+                - ingress-nginx
+                - cert-manager
+                - external-secrets
+                - kyverno
+                - argocd
+      validate:
+        message: "Images must use an explicit, non-'latest' tag (ECR is IMMUTABLE - use the build's unique tag)"
+        pattern:
+          spec:
+            containers:
+              - image: "!*:latest"

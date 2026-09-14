@@ -10,4 +10,5 @@
   roles:
     - common
     - agent_setup
+    - ci_tools
     - monitoring_agent

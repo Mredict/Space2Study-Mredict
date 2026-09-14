@@ -1,0 +1,18 @@
+---
+trivy_version: "0.74.0"
+trivy_deb_url: "https://github.com/aquasecurity/trivy/releases/download/v{{ trivy_version }}/trivy_{{ trivy_version }}_Linux-64bit.deb"
+
+cosign_version: "2.6.5"
+cosign_bin_url: "https://github.com/sigstore/cosign/releases/download/v{{ cosign_version }}/cosign-linux-amd64"
+
+syft_version: "1.51.1"
+syft_deb_url: "https://github.com/anchore/syft/releases/download/v{{ syft_version }}/syft_{{ syft_version }}_linux_amd64.deb"
+
+kyverno_cli_version: "1.17.0"
+kyverno_cli_url: "https://github.com/kyverno/kyverno/releases/download/v{{ kyverno_cli_version }}/kyverno-cli_v{{ kyverno_cli_version }}_linux_x86_64.tar.gz"
+
+kubectl_version: "1.31.4"
+kubectl_url: "https://dl.k8s.io/release/v{{ kubectl_version }}/bin/linux/amd64/kubectl"
+
+helm_version: "3.21.1"
+helm_tarball_url: "https://get.helm.sh/helm-v{{ helm_version }}-linux-amd64.tar.gz"

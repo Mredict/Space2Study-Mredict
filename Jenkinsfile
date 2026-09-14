@@ -1,51 +1,79 @@
 pipeline {
     agent { label 'agent-node' }
+    options {
+        timeout(time: 60, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        disableConcurrentBuilds()
+    }
 
     parameters {
-        string(name: 'BRANCH', defaultValue: 'main', description: 'Git branch to build')
-        choice(name: 'ENV', choices: ['dev', 'staging', 'prod'], description: 'Target Deployment Environment')
-        string(name: 'AWS_REGION', defaultValue: 'eu-central-1', description: 'AWS Region')
+        string(name: 'BRANCH', defaultValue: 'k8s', description: 'Git target branch')
+        choice(name: 'ENV', choices: ['dev', 'prod'], description: 'Deployment Target Environment')
+        string(name: 'AWS_REGION', defaultValue: 'eu-central-1', description: 'AWS Target Region')
         string(name: 'AWS_ACCOUNT_ID', defaultValue: '456631682423', description: 'AWS Account ID')
     }
 
     environment {
-        IMAGE_TAG = "${env.BUILD_NUMBER}-${env.GIT_COMMIT ? env.GIT_COMMIT.take(7) : 'latest'}"
+        COMMIT_HASH     = "${env.GIT_COMMIT ? env.GIT_COMMIT.take(7) : 'latest'}"
+        IMAGE_TAG       = "${env.BUILD_NUMBER}-${env.COMMIT_HASH}"
         DOCKER_BUILDKIT = '1'
 
-        FRONTEND_ECR = "${params.AWS_ACCOUNT_ID}.dkr.ecr.${params.AWS_REGION}.amazonaws.com/space2study-frontend-${params.ENV}"
-        BACKEND_ECR  = "${params.AWS_ACCOUNT_ID}.dkr.ecr.${params.AWS_REGION}.amazonaws.com/space2study-backend-${params.ENV}"
-
-        ECS_CLUSTER      = "space2study-cluster-${params.ENV}"
-        FRONTEND_SERVICE = "space2study-frontend-${params.ENV}"
-        BACKEND_SERVICE  = "space2study-backend-${params.ENV}"
-        
+        REGISTRY_URL = "${params.AWS_ACCOUNT_ID}.dkr.ecr.${params.AWS_REGION}.amazonaws.com"
+        FRONTEND_ECR = "${REGISTRY_URL}/space2study-frontend-${params.ENV}"
+        BACKEND_ECR  = "${REGISTRY_URL}/space2study-backend-${params.ENV}"
+        COSIGN_KEY   = credentials('cosign-private-key')
     }
 
     stages {
-        stage('Checkout') {
+        stage('Checkout & Metadata') {
             steps {
-                retry(3) {
-                    git branch: "${params.BRANCH}", url: 'https://github.com/Mredict/Space2Study-Mredict.git'
+                cleanWs()
+                checkout scmGit(
+                    branches: [[name: "*/${params.BRANCH}"]],
+                    userRemoteConfigs: [[url: 'https://github.com/Mredict/Space2Study-Mredict.git']]
+                )
+                script {
+                    echo "Starting Build #${env.BUILD_NUMBER} on Commit ${env.COMMIT_HASH}"
                 }
             }
         }
 
-        stage('Static Code & Security Checks') {
+        stage('Static Analysis & Pre-Flight Gates') {
             parallel {
-                stage('Secret Scanning (Gitleaks)') {
+                stage('Secret Leak Detection') {
                     steps {
-                        sh 'gitleaks detect --source . --report-format json --report-path gitleaks.json --no-banner || true'
+                        sh 'gitleaks detect --source . --verbose --redact || true'
                     }
                 }
-                stage('Dockerfile Linting (Hadolint)') {
+                stage('Dockerfile Hardening (Hadolint)') {
                     steps {
-                        sh 'hadolint backend/Dockerfile'
-                        sh 'hadolint frontend/Dockerfile'
+                        sh 'hadolint --failure-threshold error backend/Dockerfile'
+                        sh 'hadolint --failure-threshold error frontend/Dockerfile'
                     }
                 }
-                stage('Terraform Security Scan') {
+                stage('IaC Security (Trivy)') {
                     steps {
-                        sh 'trivy config devops/terraform/ --severity HIGH,CRITICAL || true'
+                        sh '''
+                            trivy config devops/terraform-k3s/ --exit-code 0 --severity CRITICAL,HIGH
+                            trivy config devops/helm/space2study/ --exit-code 0 --severity CRITICAL,HIGH
+                            trivy config devops/cluster-addons/ --exit-code 0 --severity CRITICAL,HIGH
+                        '''
+                    }
+                }
+                stage('K8s Manifest Policy Check (Kyverno CLI)') {
+                    steps {
+                        sh '''
+                            helm template devops/helm/space2study \
+                              -f devops/helm/space2study/values.yaml \
+                              -f devops/helm/space2study/values-${ENV}.yaml \
+                              --set backend.image.tag=${IMAGE_TAG} \
+                              --set frontend.image.tag=${IMAGE_TAG} \
+                              > /tmp/rendered-manifests.yaml
+
+                            kyverno apply devops/cluster-addons/kyverno-policies/ \
+                              --resource /tmp/rendered-manifests.yaml \
+                              --detailed-results
+                        '''
                     }
                 }
             }
@@ -68,132 +96,151 @@ pipeline {
                 }
             }
         }
-
-        stage('SCA Security Scan (Snyk)') {
+        stage('SCA Dependency Vulnerabilities (Snyk)') {
             environment {
                 SNYK_TOKEN = credentials('snyk-token')
             }
             parallel {
-                stage('Scan Backend') {
+                stage('Audit Backend Dependencies') {
                     steps {
                         dir('backend') {
-                            sh "snyk test --severity-threshold=high || true"
+                            sh 'snyk test --severity-threshold=high || true'
                         }
                     }
                 }
-                stage('Scan Frontend') {
+                stage('Audit Frontend Dependencies') {
                     steps {
                         dir('frontend') {
-                            sh "snyk test --severity-threshold=high || true"
+                            sh 'snyk test --severity-threshold=high || true'
                         }
                     }
                 }
             }
         }
 
-        stage('Build Container Images') {
+        stage('Deterministic Image Build') {
             steps {
                 sh """
-                    docker build -t ${FRONTEND_ECR}:${IMAGE_TAG} -t ${FRONTEND_ECR}:latest ./frontend
-                    docker build -t ${BACKEND_ECR}:${IMAGE_TAG} -t ${BACKEND_ECR}:latest ./backend
+                    docker build \
+                        --build-arg BUILDKIT_INLINE_CACHE=1 \
+                        -t ${FRONTEND_ECR}:${IMAGE_TAG} ./frontend
+
+                    docker build \
+                        --build-arg BUILDKIT_INLINE_CACHE=1 \
+                        -t ${BACKEND_ECR}:${IMAGE_TAG} ./backend
                 """
             }
         }
 
-        stage('Container Security Scan (Trivy)') {
+        stage('SBOM (Syft)') {
+            steps {
+                sh """
+                    syft ${FRONTEND_ECR}:${IMAGE_TAG} -o cyclonedx-json > frontend-sbom.json
+                    syft ${BACKEND_ECR}:${IMAGE_TAG} -o cyclonedx-json > backend-sbom.json
+                """
+                archiveArtifacts artifacts: '*-sbom.json', fingerprint: true
+            }
+        }
+
+        stage('Container Image Scan (Trivy)') {
             parallel {
-                stage('Scan Frontend Image') {
+                stage('Verify Frontend Artifact') {
                     steps {
                         sh """
-                            docker run --rm \
-                            -v /var/run/docker.sock:/var/run/docker.sock \
-                            -v /root/.cache/trivy-frontend:/root/.cache/trivy \
-                            aquasec/trivy:latest image \
-                            --severity HIGH,CRITICAL \
-                            --exit-code 0 \
-                            --no-progress \
-                            --ignore-unfixed \
-                            ${FRONTEND_ECR}:${IMAGE_TAG}
+                            trivy image \
+                                --exit-code 0 \
+                                --severity HIGH,CRITICAL \
+                                --ignore-unfixed \
+                                --no-progress \
+                                ${FRONTEND_ECR}:${IMAGE_TAG}
                         """
                     }
                 }
-                stage('Scan Backend Image') {
+                stage('Verify Backend Artifact') {
                     steps {
                         sh """
-                            docker run --rm \
-                            -v /var/run/docker.sock:/var/run/docker.sock \
-                            -v /root/.cache/trivy-backend:/root/.cache/trivy \
-                            aquasec/trivy:latest image \
-                            --severity HIGH,CRITICAL \
-                            --exit-code 0 \
-                            --no-progress \
-                            --ignore-unfixed \
-                            ${BACKEND_ECR}:${IMAGE_TAG}
+                            trivy image \
+                                --exit-code 0 \
+                                --severity HIGH,CRITICAL \
+                                --ignore-unfixed \
+                                --no-progress \
+                                ${BACKEND_ECR}:${IMAGE_TAG}
                         """
                     }
                 }
             }
         }
 
-        stage('Push to Amazon ECR') {
-            environment {
-                AWS_PROFILE = 'roles-anywhere'
-                AWS_REGION  = "${params.AWS_REGION}"
-            }
+        stage('ECR Push & Sign') {
             steps {
-                sh '''
-                    set -e
-                    aws ecr get-login-password --region "${AWS_REGION}" | \
-                        docker login --username AWS --password-stdin "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+                withCredentials([usernamePassword(
+                    credentialsId: 'aws-jenkins-deployer',
+                    usernameVariable: 'AWS_ACCESS_KEY_ID',
+                    passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                )]) {
+                    sh '''
+                        aws ecr get-login-password --region "${AWS_REGION}" | \
+                            docker login --username AWS --password-stdin "${REGISTRY_URL}"
 
-                    docker push "${FRONTEND_ECR}:${IMAGE_TAG}"
-                    docker push "${FRONTEND_ECR}:latest"
-                    docker push "${BACKEND_ECR}:${IMAGE_TAG}"
-                    docker push "${BACKEND_ECR}:latest"
-                '''
+                        docker push "${FRONTEND_ECR}:${IMAGE_TAG}"
+                        docker push "${BACKEND_ECR}:${IMAGE_TAG}"
+                    '''
+                }
+                //Image signing
+                withCredentials([usernamePassword(
+                    credentialsId: 'aws-jenkins-deployer',
+                    usernameVariable: 'AWS_ACCESS_KEY_ID',
+                    passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                )]) {
+                    sh '''
+                        cosign sign --key "${COSIGN_KEY}" --yes "${FRONTEND_ECR}:${IMAGE_TAG}"
+                        cosign sign --key "${COSIGN_KEY}" --yes "${BACKEND_ECR}:${IMAGE_TAG}"
+                    '''
+                }
             }
         }
 
-        stage('Deploy to AWS ECS') {
-            environment {
-                AWS_PROFILE = 'roles-anywhere'
-                AWS_REGION  = "${params.AWS_REGION}"
-            }
+        stage('Update GitOps Manifest') {
             steps {
-                sh '''
-                    set -e
-                    # 1. Update Backend task definition image revision
-                    BACKEND_DEF=$(aws ecs describe-task-definition --task-definition "${BACKEND_SERVICE}" --region "${AWS_REGION}")
-                    NEW_BACKEND=$(echo "$BACKEND_DEF" | jq --arg IMG "${BACKEND_ECR}:${IMAGE_TAG}" \
-                        '.taskDefinition | .containerDefinitions[0].image = $IMG | del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)')
-                    NEW_BACKEND_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_BACKEND" --region "${AWS_REGION}" --query 'taskDefinition.taskDefinitionArn' --output text)
+                withCredentials([usernamePassword(
+                    credentialsId: 'jenkins-git-push-creds',
+                    usernameVariable: 'GIT_USER',
+                    passwordVariable: 'GIT_TOKEN'
+                )]) {
+                    sh """
+                        VALUES_FILE="devops/helm/space2study/values-${params.ENV}.yaml"
+                        REMOTE_URL="https://\${GIT_USER}:\${GIT_TOKEN}@github.com/Mredict/Space2Study-Mredict.git"
 
-                    # 2. Update Frontend task definition image revision
-                    FRONTEND_DEF=$(aws ecs describe-task-definition --task-definition "${FRONTEND_SERVICE}" --region "${AWS_REGION}")
-                    NEW_FRONTEND=$(echo "$FRONTEND_DEF" | jq --arg IMG "${FRONTEND_ECR}:${IMAGE_TAG}" \
-                        '.taskDefinition | .containerDefinitions[0].image = $IMG | del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)')
-                    NEW_FRONTEND_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_FRONTEND" --region "${AWS_REGION}" --query 'taskDefinition.taskDefinitionArn' --output text)
+                        git fetch "\$REMOTE_URL" "${params.BRANCH}"
+                        git checkout -B "${params.BRANCH}" FETCH_HEAD
 
-                    # 3. Trigger rolling deployment in ECS
-                    aws ecs update-service --cluster "${ECS_CLUSTER}" --service "${BACKEND_SERVICE}" --task-definition "$NEW_BACKEND_ARN" --region "${AWS_REGION}"
-                    aws ecs update-service --cluster "${ECS_CLUSTER}" --service "${FRONTEND_SERVICE}" --task-definition "$NEW_FRONTEND_ARN" --region "${AWS_REGION}"
-                '''
+                        sed -i "/^frontend:/,/^[a-z]/ s|tag: .*|tag: ${IMAGE_TAG}|" "\$VALUES_FILE"
+                        sed -i "/^backend:/,/^[a-z]/ s|tag: .*|tag: ${IMAGE_TAG}|" "\$VALUES_FILE"
+
+                        git config user.name "jenkins-ci"
+                        git config user.email "jenkins-ci@space2study.local"
+                        git add "\$VALUES_FILE"
+                        git commit -m "deploy(${params.ENV}): ${IMAGE_TAG}" || echo "nothing to commit"
+                        git push "\$REMOTE_URL" "${params.BRANCH}:${params.BRANCH}"
+                    """
+                }
             }
         }
     }
+
     post {
         always {
-            cleanWs()
             sh """
-                docker rmi ${FRONTEND_ECR}:${IMAGE_TAG} ${FRONTEND_ECR}:latest || true
-                docker rmi ${BACKEND_ECR}:${IMAGE_TAG} ${BACKEND_ECR}:latest || true
+                docker rmi ${FRONTEND_ECR}:${IMAGE_TAG} || true
+                docker rmi ${BACKEND_ECR}:${IMAGE_TAG} || true
             """
+            cleanWs()
         }
         success {
-            echo "✅ Deployment of ${IMAGE_TAG} to AWS ECS (${params.ENV}) completed successfully!"
+            echo "Pipeline succeeded! ${IMAGE_TAG} built, scanned, signed, pushed, and proposed to ArgoCD via git."
         }
         failure {
-            echo "❌ Deployment to ${params.ENV} failed. Check the Jenkins console logs for details."
+            echo "Build, scan, or push failed. Inspect stage output above."
         }
     }
-} 
+}

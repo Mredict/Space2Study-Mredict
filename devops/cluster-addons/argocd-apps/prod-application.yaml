@@ -1,0 +1,22 @@
+# EDIT repoURL and targetRevision before applying
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prod-space2study
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Mredict/Space2Study-Mredict.git
+    targetRevision: main
+    path: devops/helm/space2study
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-prod.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: space2study-prod
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true

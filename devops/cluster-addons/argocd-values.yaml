@@ -1,0 +1,45 @@
+# helm install argocd argo/argo-cd -n argocd --create-namespace \
+#   --version 10.8.1 -f cluster-addons/argocd-values.yaml
+
+dex:
+  enabled: false
+
+notifications:
+  enabled: false
+
+applicationSet:
+  enabled: false
+
+controller:
+  resources:
+    requests: { cpu: 50m, memory: 256Mi }
+    limits: { cpu: 250m, memory: 768Mi }
+  podSecurityContext:
+    runAsNonRoot: true
+
+server:
+  resources:
+    requests: { cpu: 30m, memory: 64Mi }
+    limits: { cpu: 150m, memory: 192Mi }
+  podSecurityContext:
+    runAsNonRoot: true
+  service:
+    type: ClusterIP
+
+repoServer:
+  resources:
+    requests: { cpu: 30m, memory: 128Mi }
+    limits: { cpu: 200m, memory: 256Mi }
+  podSecurityContext:
+    runAsNonRoot: true
+
+redis:
+  resources:
+    requests: { cpu: 20m, memory: 32Mi }
+    limits: { cpu: 100m, memory: 96Mi }
+  podSecurityContext:
+    runAsNonRoot: true
+
+configs:
+  params:
+    server.insecure: true

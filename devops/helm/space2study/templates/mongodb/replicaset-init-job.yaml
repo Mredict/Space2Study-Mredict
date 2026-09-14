@@ -1,0 +1,74 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mongodb-rs-init
+  namespace: {{ .Values.namespace }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "1"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  backoffLimit: 6
+  template:
+    metadata:
+      labels: { app: mongodb-rs-init }
+    spec:
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: rs-init
+          image: mongo:7.0.14
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: 200m, memory: 128Mi }
+          env:
+            - name: MONGO_INITDB_ROOT_USERNAME
+              valueFrom:
+                secretKeyRef: { name: mongodb-credentials, key: MONGO_INITDB_ROOT_USERNAME }
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: mongodb-credentials, key: MONGO_INITDB_ROOT_PASSWORD }
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -e
+              HOST0="mongodb-0.mongodb-headless.{{ .Values.namespace }}.svc.cluster.local:{{ .Values.mongodb.port }}"
+              AUTH_ARGS="-u $MONGO_INITDB_ROOT_USERNAME -p $MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin"
+
+              until mongosh --host "$HOST0" $AUTH_ARGS --quiet --eval "db.adminCommand('ping')" >/dev/null 2>&1; do
+                echo "waiting for mongodb-0..."; sleep 5
+              done
+
+              ALREADY_INIT=$(mongosh --host "$HOST0" $AUTH_ARGS --quiet --eval "try { rs.status(); print('yes') } catch(e) { print('no') }")
+              if [ "$ALREADY_INIT" = "yes" ]; then
+                echo "replica set already initiated, nothing to do"
+                exit 0
+              fi
+
+              mongosh --host "$HOST0" $AUTH_ARGS --quiet --eval '
+                rs.initiate({
+                  _id: "rs0",
+                  members: [
+{{- range $i := until (int .Values.mongodb.replicas) }}
+                    { _id: {{ $i }}, host: "mongodb-{{ $i }}.mongodb-headless.{{ $.Values.namespace }}.svc.cluster.local:{{ $.Values.mongodb.port }}" }{{ if lt (add1 $i) (int $.Values.mongodb.replicas) }},{{ end }}
+{{- end }}
+                  ]
+                })
+              '
+              echo "replica set initiated"
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

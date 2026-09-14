@@ -1,0 +1,6 @@
+apiVersion: v2
+name: space2study
+description: Space2Study - frontend, backend, and self-hosted MongoDB replica set
+type: application
+version: 1.0.0
+appVersion: "1.0.0"

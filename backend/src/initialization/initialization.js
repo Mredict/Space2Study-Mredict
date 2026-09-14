@@ -24,13 +24,14 @@ const initialization = (app) => {
       allowedHeaders: 'Content-Type, Authorization'
     })
   )
-
   const swaggerSettings = swaggerJsDoc(swaggerOptions)
   app.use('/api-docs', swaggerUI.serve, swaggerUI.setup(swaggerSettings))
 
   app.use('/api', router);
   app.use('/', router)
 
+  app.get('/health', (_req, res) => res.status(200).json({ status: 'ok' }))
+  
   app.use((_req, _res, next) => {
     next(createNotFoundError())
   })

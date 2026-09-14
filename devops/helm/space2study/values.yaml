@@ -1,0 +1,74 @@
+namespace: space2study
+
+domain: ""
+
+image:
+  registry: ""
+
+frontend:
+  image:
+    repository: space2study-frontend-dev
+    tag: latest
+  replicas: 2
+  port: 8080
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { cpu: 250m, memory: 256Mi }
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 4
+    targetCPUUtilizationPercentage: 70
+
+backend:
+  image:
+    repository: space2study-backend-dev
+    tag: latest
+  replicas: 2
+  port: 8080
+  resources:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits: { cpu: 500m, memory: 512Mi }
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+  env:
+    NODE_ENV: production
+    SERVER_PORT: "8080"
+    JWT_ACCESS_EXPIRES_IN: 1h
+    JWT_REFRESH_EXPIRES_IN: 7d
+    JWT_RESET_EXPIRES_IN: 1h
+    JWT_CONFIRM_EXPIRES_IN: 1h
+    MAIL_FIRSTNAME: Admin
+    MAIL_LASTNAME: Space2Study
+
+mongodb:
+  replicas: 3
+  port: 27017
+  storageClassName: local-path
+  storageSize: 10Gi
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { cpu: 500m, memory: 768Mi }
+
+externalSecrets:
+  region: eu-central-1
+  appSecretsName: space2study-app-secrets-dev
+
+ingress:
+  className: nginx
+  tlsSecretName: space2study-tls-selfsigned
+
+networkPolicy:
+  enabled: true
+
+podDisruptionBudget:
+  maxUnavailable: 1
+
+resourceQuota:
+  enabled: true
+  cpu: "4"
+  memory: 6Gi
+  pods: "40"
